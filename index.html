@@ -144,11 +144,11 @@ td.who{cursor:pointer}
 /* scelta persona */
 .sheet[hidden]{display:none}
 .sheet{position:fixed;inset:0;z-index:40;background:rgba(10,18,28,.55);display:grid;align-items:end}
-.sheet .p{background:var(--surface);border-radius:20px 20px 0 0;max-height:82%;display:grid;grid-template-rows:auto auto 1fr;max-width:560px;width:100%;margin:0 auto;
+.sheet .p{background:var(--surface);border-radius:20px 20px 0 0;max-height:82vh;max-height:82dvh;display:flex;flex-direction:column;max-width:560px;width:100%;margin:0 auto;
   padding:16px max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
 .sheet h3{margin:0 0 4px;font:700 22px var(--display)}
 .sheet p{margin:0 0 10px;color:var(--muted);font-size:14px}
-.sheet .l{overflow:auto;display:grid;gap:6px;align-content:start}
+.sheet .l{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;display:grid;gap:6px;align-content:start}
 .sheet .l button{display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:12px;min-height:50px;padding:0 14px}
 .sheet .l button[aria-pressed="true"]{border-color:var(--brand);background:var(--brand-soft);font-weight:700}
 .sheet .l span{color:var(--muted);font-size:14px}
