@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Turni">
+<meta name="theme-color" content="#426b8e">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23426b8e'/%3E%3Crect x='14' y='18' width='36' height='32' rx='5' fill='none' stroke='white' stroke-width='4'/%3E%3Cpath d='M14 28h36M24 12v10M40 12v10' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<title>Turni Settore Nord</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: app a una colonna per smartphone, barra in basso con 5 sezioni (Oggi, Settimana, Mese, Cerca, Tabella).
+   Colori: palette azzurro/grigio del file Excel; i turni mantengono i colori per fascia (mattina, seminotte, verdone, bussolotto, notturna). */
+:root{
+  --bg:#f3f6f8; --surface:#ffffff; --ink:#1b2b3a; --muted:#5b6b7d; --line:#d7e1ea;
+  --brand:#426b8e; --brand-ink:#294b69; --brand-soft:#dceaf3; --hol:#c00000; --now:#ffc000;
+  --f-mattina:#ffe699; --f-seminotte:#bdd7ee; --f-verdone:#c6e0b4; --f-bussolotto:#f8cbad; --f-notturna:#b4a7d6;
+  --f-riposo:#d0cece; --f-altro:#eceff2; --f-ink:#1f2a37;
+  --display:'Barlow Semi Condensed',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --body:'Atkinson Hyperlegible',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1620; --surface:#16212c; --ink:#e6edf3; --muted:#9aabbb; --line:#2a3947;
+  --brand:#7fb0d8; --brand-ink:#a9cdea; --brand-soft:#1c3043; --hol:#ff8f8f; --now:#ffb000;
+  --f-mattina:#75661f; --f-seminotte:#2e4d70; --f-verdone:#3b5c34; --f-bussolotto:#7a4833; --f-notturna:#4f4579;
+  --f-riposo:#43474c; --f-altro:#262e37; --f-ink:#f1f5f9; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1620; --surface:#16212c; --ink:#e6edf3; --muted:#9aabbb; --line:#2a3947;
+  --brand:#7fb0d8; --brand-ink:#a9cdea; --brand-soft:#1c3043; --hol:#ff8f8f; --now:#ffb000;
+  --f-mattina:#75661f; --f-seminotte:#2e4d70; --f-verdone:#3b5c34; --f-bussolotto:#7a4833; --f-notturna:#4f4579;
+  --f-riposo:#43474c; --f-altro:#262e37; --f-ink:#f1f5f9; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{min-height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 var(--body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:0 96px;-webkit-text-size-adjust:100%}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--brand)}
+.wrap{max-width:560px;margin:0 auto}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--now);outline-offset:2px}
+/* intestazione */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;margin:0 calc(-1 * max(16px,env(safe-area-inset-right,0px))) 0 calc(-1 * max(16px,env(safe-area-inset-left,0px)));
+  padding:10px max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));background:var(--brand);color:#fff}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{font:700 20px/1.1 var(--display);letter-spacing:.02em;text-transform:uppercase;min-width:0}
+.brand small{display:block;font:500 12px/1.2 var(--body);letter-spacing:.04em;text-transform:none;opacity:.85}
+.me{display:flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.55);background:rgba(255,255,255,.12);color:#fff;
+  border-radius:999px;padding:6px 12px;font-weight:700;font-size:14px;max-width:62%;min-height:40px}
+.me span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.me svg{flex:none}
+main{padding-top:16px}
+h2{font:700 13px/1.2 var(--display);letter-spacing:.09em;text-transform:uppercase;color:var(--brand-ink);margin:22px 0 8px}
+h2:first-child{margin-top:4px}
+/* navigazione periodo */
+.nav{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.nav .lbl{flex:1;text-align:center;font:700 19px/1.2 var(--display);letter-spacing:.01em;min-width:0}
+.nav .lbl small{display:block;font:400 13px var(--body);color:var(--muted);letter-spacing:0}
+.btn{min-width:46px;min-height:46px;border:1px solid var(--line);background:var(--surface);border-radius:12px;font-weight:700;display:grid;place-items:center;padding:0 12px}
+.btn.today{font-size:13px;min-width:64px}
+/* fasce */
+.f-mattina{background:var(--f-mattina)} .f-seminotte{background:var(--f-seminotte)} .f-verdone{background:var(--f-verdone)}
+.f-bussolotto{background:var(--f-bussolotto)} .f-notturna{background:var(--f-notturna)} .f-riposo{background:var(--f-riposo)} .f-altro{background:var(--f-altro)}
+.f-mattina,.f-seminotte,.f-verdone,.f-bussolotto,.f-notturna,.f-riposo,.f-altro{color:var(--f-ink)}
+/* righe giorno */
+.rows{display:grid;gap:8px}
+.row{display:grid;grid-template-columns:54px 1fr auto;align-items:center;gap:12px;border-radius:14px;padding:10px 14px;min-height:68px;border:2px solid transparent}
+.row.is-today{border-color:var(--now);box-shadow:0 0 0 2px var(--now) inset}
+.dd{display:grid;justify-items:center;line-height:1}
+.dd span{font:600 12px var(--display);letter-spacing:.08em;text-transform:uppercase;opacity:.8}
+.dd b{font:700 30px/1 var(--display)}
+.row .t{font:700 20px/1.15 var(--display);letter-spacing:.01em}
+.row .s{font-size:14px;opacity:.85}
+.tag{font:700 11px var(--display);letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:999px;background:var(--surface);color:var(--hol);border:1px solid var(--hol)}
+/* scheda principale */
+.hero{border-radius:20px;padding:18px;display:grid;gap:6px}
+.hero .k{font:700 12px var(--display);letter-spacing:.1em;text-transform:uppercase;opacity:.8}
+.hero .big{font:700 40px/1.05 var(--display);letter-spacing:.01em}
+.hero .time{font:600 24px/1.1 var(--display)}
+.hero .st{font-size:15px;margin-top:4px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.muted{color:var(--muted);font-size:14px}
+.empty{padding:28px 8px;text-align:center;color:var(--muted)}
+.empty b{display:block;color:var(--ink);font:700 20px var(--display);margin-bottom:6px}
+.cta{margin-top:14px;background:var(--brand);color:#fff;border:0;border-radius:12px;min-height:48px;padding:0 20px;font-weight:700}
+/* mese */
+.dow,.mgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+.dow{margin-bottom:3px}
+.dow span{text-align:center;font:700 12px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.cell{border:2px solid transparent;border-radius:9px;padding:3px 2px 5px;min-height:62px;display:grid;align-content:start;justify-items:center;gap:1px;text-align:center;line-height:1.1}
+.cell .n{font:700 13px var(--display);align-self:start;justify-self:start;padding-left:3px}
+.cell .c{font:700 12px var(--display);letter-spacing:.01em}
+.cell .h{font:500 12px var(--display)}
+.cell.out{opacity:.42}
+.cell.hol .n{color:var(--hol)}
+.cell.is-today{border-color:var(--now)}
+.cell.sel{outline:3px solid var(--brand-ink);outline-offset:-1px}
+.detail{margin-top:10px;border-radius:14px;padding:12px 14px;min-height:64px}
+.detail b{font:700 20px var(--display)}
+.sum{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.sum div{display:flex;justify-content:space-between;align-items:baseline;border-radius:10px;padding:8px 12px;font-size:15px}
+.sum b{font:700 20px var(--display)}
+/* cerca */
+select{width:100%;min-height:52px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:0 12px;font:inherit;font-size:17px}
+.res{display:grid;gap:6px}
+.res .g{font:700 13px var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--brand-ink);margin-top:10px}
+.res .r{display:flex;justify-content:space-between;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;min-height:48px}
+.res .r.mine{background:var(--brand-soft);border-color:var(--brand)}
+.res .r b{font-weight:700}
+.res .r span{color:var(--muted);font-size:14px;white-space:nowrap}
+/* tabella */
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface);-webkit-overflow-scrolling:touch}
+table{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%}
+th,td{padding:0;border-bottom:1px solid var(--line);border-right:1px solid var(--line);text-align:center}
+th{position:sticky;top:0;background:var(--brand);color:#fff;font:700 13px/1.15 var(--display);letter-spacing:.04em;padding:8px 4px;z-index:2}
+th small{display:block;font:500 12px var(--display)}
+th.hol{background:#8d2b2b}
+td.who,th.who{position:sticky;left:0;z-index:3;text-align:left;min-width:104px;max-width:104px;padding:6px 8px;background:var(--surface)}
+th.who{background:var(--brand);z-index:4}
+td.who b{display:block;font:700 14px/1.1 var(--display)}
+td.who small{color:var(--muted);font-size:12px}
+td.s{min-width:62px;padding:5px 2px;font-size:12px;line-height:1.15}
+td.s b{display:block;font:700 13px var(--display)}
+td.s i{font:500 12px var(--display);font-style:normal}
+tr.me td.who{background:var(--now);color:#1f2a37}
+tr.me td.who small{color:#1f2a37}
+tr.me td.s{box-shadow:inset 0 2px 0 var(--ink),inset 0 -2px 0 var(--ink)}
+tr.off td.s{opacity:.35}
+input[type=search]{width:100%;min-height:48px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:0 14px;font:inherit;font-size:17px;margin-bottom:10px}
+tbody tr[hidden]{display:none}
+td.who{cursor:pointer}
+.foot{text-align:center;margin-top:26px}
+/* barra in basso */
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:25;background:var(--surface);border-top:1px solid var(--line);
+  padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px))}
+.tabs .wrap{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.tab{border:0;background:none;display:grid;justify-items:center;gap:2px;padding:6px 0 4px;border-radius:12px;color:var(--muted);font:600 12px var(--display);letter-spacing:.05em;text-transform:uppercase;min-height:54px}
+.tab svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tab[aria-current="page"]{color:var(--brand-ink);background:var(--brand-soft)}
+/* scelta persona */
+.sheet[hidden]{display:none}
+.sheet{position:fixed;inset:0;z-index:40;background:rgba(10,18,28,.55);display:grid;align-items:end}
+.sheet .p{background:var(--surface);border-radius:20px 20px 0 0;max-height:82%;display:grid;grid-template-rows:auto auto 1fr;max-width:560px;width:100%;margin:0 auto;
+  padding:16px max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.sheet h3{margin:0 0 4px;font:700 22px var(--display)}
+.sheet p{margin:0 0 10px;color:var(--muted);font-size:14px}
+.sheet .l{overflow:auto;display:grid;gap:6px;align-content:start}
+.sheet .l button{display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:12px;min-height:50px;padding:0 14px}
+.sheet .l button[aria-pressed="true"]{border-color:var(--brand);background:var(--brand-soft);font-weight:700}
+.sheet .l span{color:var(--muted);font-size:14px}
+@media (prefers-reduced-motion:no-preference){.row,.hero,.card{animation:in .18s ease-out}@keyframes in{from{opacity:.4;transform:translateY(4px)}}}
+</style>
+
+<header class="top"><div class="wrap">
+  <div class="brand">Turni Settore Nord<small>Controllo di Esercizio · Superficie</small></div>
+  <button class="me" id="me" data-act="pick" aria-label="Scegli l'agente"></button>
+</div></header>
+<main class="wrap" id="view" aria-live="polite"></main>
+<nav class="tabs" aria-label="Sezioni"><div class="wrap" id="tabs"></div></nav>
+<div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sh-t"><div class="p">
+  <h3 id="sh-t">Scegli l'agente</h3><p>Puoi vedere i turni di qualsiasi collega. L'app ricorda la scelta su questo telefono.</p>
+  <div class="l" id="list"></div></div></div>
+
+<script>
+(function(){
+const D={"base":[[30134,"TOMBESI"],[35063,"CECCHINI"],[null,null],[32583,"NARDI"],[33611,"BOSCHETTI"],[null,null],[null,null],[31563,"IACCHINI"],[35832,"PIAZZA"],[36132,"D'ATTILIA"],[30906,"PELLEGRINI"],[36202,"CARDONE"],[32114,"DAMIANI"],[33736,"LUCCI"],[34371,"D'ANGELO"],[29914,"FORESI"],[35215,"MORICONI"],[35211,"MURATORI"],[36108,"OLIVETO"],[30293,"SGRULLONI"],[31440,"CURTI"],[30677,"DE SANTIS"],[33437,"DI NICOLA"],[32813,"CAPRARO"]],"grid":[[["RIPOSO",null],["SN1 - 11:30","VAR - 4"],["VM","SN1 - 05:20"],["RGR - 23:00","VM"],["VAR - 4","VAR - 4"],["SN1 - 05:20","SN1 - 05:20"],["RIPOSO",null]],[["VP","SN1 - 17:40"],["SN4 - 11:30","SN1 - 17:40"],["SN1 - 17:40","SN3 - 15:30"],["RGR - 11:40","VP"],["SN1 - 17:40","SN3 - 15:30"],["RGR - 11:00","VAR - 4"],["RIPOSO",null]],[["VM","SN1 - 05:20"],["SN4 - 05:20","SN1 - 05:20"],["RGR - 5:20","VM"],["RGR - 11:00","VM"],["SN1 - 05:20","VM"],["RGR - 23:00","LP"],["RIPOSO",null]],[["RGR - 16:30","SN3-15.30"],["VP","VP"],["SN3 - 15:30","VP"],["RGR - 17:00","SN4-17.40"],["SN4 - 11:30","LP"],["RIPOSO",null],["SN1 - 11:30",null]],[["RMS - 04:40","VM"],["RGR - 23:00","VM"],["VAR - 4","RGR - 11:00"],["VM","LP"],["RIPOSO",null],["SN3 - 15:30","SN1 - 17:40"],["RGR - 17:00",null]],[["VP","RGR - 17:00"],["SN1 - 17:40","SN4 - 11:30"],["SN4 - 11:30","LP"],["RIPOSO",null],["VAR - 4","SN1 - 11:30"],["SN4 - 5:20","VM"],["RGR-23.00",null]],[["VAR - 4","SN4 - 11:30"],["RGR - 5:20","LP"],["RIPOSO",null],["SN4 - 17:40","SN1 - 17:40"],["SN4 - 17:40","VP"],["RGR - 17:00","VP"],["VP",null]],[["RGR - 11:00","LP"],["RIPOSO",null],["RGR - 11:40","SN1 - 11:30"],["SN4 - 05:20","VM"],["RMS - 04:40","SN1 - 05:20"],["VAR - 4","VM"],["SN1 - 05:20",null]],[["RIPOSO",null],["SN4 - 17:40","VP"],["RGR - 11:00","RGR - 17:00"],["VP","RGR - 11:00"],["VP","VP"],["SN4 - 11:30","VAR - 4"],["RIPOSO",null]],[["SN4 - 5:20","VM"],["SN1 - 05:20","RGR - 23:00"],["RGR - 23:00","RGR - 23:00"],["VM","SN1 - 5:20"],["SN4 - 5:20","RGR - 23:00"],["VM","LP"],["RIPOSO",null]],[["SN4 - 17:40","VP"],["SN3 - 15:30","RGR - 17:00"],["SN4 - 17:40","VP"],["SN4 - 11:30","RGR - 17:00"],["RGR - 17:00","SN4 - 11:30"],["SN1 - 11:30","RGR - 11:00"],["RIPOSO",null]],[["SN4 - 11:30","RGR - 11:00"],["VM","VM"],["RGR - 04:50","VM"],["VAR - 4","RGR - 23:00"],["RGR - 05:20","LP"],["RIPOSO",null],["SN1 - 17:40",null]],[["SN1 - 17:40","SN1 - 11:30"],["RGR - 16:30","RGR - 11:00"],["RGR - 16:30","VP"],["SN1 - 11:30","LP"],["RIPOSO",null],["VAR - 4","SN1 - 11:30"],["SN4 - 05:20",null]],[["RGR - 23:00","RGR - 23:00"],["VAR - 4","VM"],["SN1 - 05:20","LP"],["RIPOSO",null],["RGR - 16:30","SN1 - 17:40"],["SN1 - 17:40","RGR - 17:00"],["SN4 - 17:40",null]],[["VP","VP"],["RGR - 11:00","LP"],["RIPOSO",null],["SN2 - 12:30","SN1 - 11:30"],["RGR - 04:50","VM"],["VM","RGR - 23:00"],["VAR - 4",null]],[["RGR - 5:20","LP"],["RIPOSO",null],["RGR - 17:00","SN1 - 17:40"],["SN1 - 17:40","VP"],["RGR - 11:00","RGR - 17:00"],["VP","VP"],["SN4 - 11:30",null]],[["RIPOSO",null],["SN2 - 12:30","VAR - 4"],["VM","VM"],["RGR - 04:50","VM"],["VM","RGR - 11:00"],["RGR - 05:20","SN4 - 05:20"],["RIPOSO",null]],[["RGR - 17:00","SN4 - 17:40"],["RGR - 11:40","SN3 - 15:30"],["VP","SN4 - 17:40"],["VP","VP"],["SN3 - 15:30","VP"],["RGR - 11:40","SN4 - 11:30"],["RIPOSO",null]],[["SN1 - 05:20","VM"],["RGR - 04:50","SN4 - 05:20"],["RMS - 04:40","SN4 - 05:20"],["RGR - 05:20","VM"],["VM","SN4 - 05:20"],["RGR - 04:50","LP"],["RIPOSO",null]],[["SN3 - 15:30","VP"],["RGR - 17:00","SN4 - 17:40"],["VP","VP"],["SN3 - 15:30","SN3 - 15:30"],["RGR - 11:40","LP"],["RIPOSO",null],["RGR - 11:00",null]],[["RGR - 04:50","SN4 - 05:20"],["VM","VM"],["SN4 - 05:20","VAR - 4"],["RMS - 04:40","LP"],["RIPOSO",null],["SN4 - 17:40","SN4 - 17:40"],["SN3 - 15:30",null]],[["RGR - 11:40","VP"],["VP","SN1 - 11:30"],["SN2 - 12:30","LP"],["RIPOSO",null],["SN1 - 11:30","VAR - 4"],["VM","VM"],["RGR - 05:00",null]],[["SN1 - 11:30","VAR - 4"],["RMS - 04:40","LP"],["RIPOSO",null],["RGR -16:30","SN4 - 11:30"],["VP","SN4 - 17:40"],["RGR - 16:30","SN3 - 15:30"],["VP",null]],[["SN2 - 12:30","LP"],["RIPOSO",null],["SN1 - 11:30","SN4 - 11:30"],["SN1 - 05:20","SN4 - 05:20"],["RGR - 23:00","VM"],["VAR - 4","VAR - 4"],["VM",null]]],"base0":"2026-10-26","local":[],"updated":"28 ott 2026"};
+const DAY=['Lun','Mar','Mer','Gio','Ven','Sab','Dom'], DAYL=['lunedì','martedì','mercoledì','giovedì','venerdì','sabato','domenica'];
+const MON=['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
+const MONL=['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
+const FNAME={mattina:'mattina',seminotte:'seminotte',verdone:'verdone',bussolotto:'bussolotto',notturna:'notturna',riposo:'riposo',altro:''};
+const ALL=new Set(['VP','VM','VAR-4','LP','RIPOSO']);
+const DUR=390; // 6 h 30 min
+const $=s=>document.querySelector(s);
+const pad=n=>String(n).padStart(2,'0');
+const hm=m=>pad(Math.floor(m/60)%24)+':'+pad(m%60);
+const sod=d=>new Date(d.getFullYear(),d.getMonth(),d.getDate());
+const add=(d,n)=>{const x=sod(d);x.setDate(x.getDate()+n);return x};
+const mon=d=>{const x=sod(d);x.setDate(x.getDate()-((x.getDay()+6)%7));return x};
+const wkIdx=d=>(d.getDay()+6)%7;
+const key=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const nice=s=>s?s.trim().toLowerCase().replace(/(^|[\s'])([a-zà-ú])/g,(a,b,c)=>b+c.toUpperCase()):'';
+const BASE=D.base.map(([m,n])=>({m,n:nice(n)}));
+const B0=(()=>{const [y,m,d]=D.base0.split('-').map(Number);return new Date(y,m-1,d)})();
+
+/* ---- festività ---- */
+function easter(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),
+  h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),
+  mo=Math.floor((h+l-7*m+114)/31),da=(h+l-7*m+114)%31+1;return new Date(y,mo-1,da)}
+const FIX={'1-1':'Capodanno','6-1':'Epifania','25-4':'Liberazione','1-5':'Festa del Lavoro','2-6':'Festa della Repubblica','15-8':'Ferragosto','1-11':'Ognissanti','8-12':'Immacolata','25-12':'Natale','26-12':'Santo Stefano'};
+(D.local||[]).forEach(([g,m,n])=>{FIX[g+'-'+m]=n||'Festivo'});
+const eCache={};
+function holName(d){const k=d.getDate()+'-'+(d.getMonth()+1);if(FIX[k])return FIX[k];
+  const y=d.getFullYear();const e=eCache[y]||(eCache[y]=easter(y));
+  const p=add(e,1);if(sod(d).getTime()===p.getTime())return "Lunedì dell'Angelo";return ''}
+
+/* ---- turni ---- */
+const norm=r=>(r||'').toUpperCase().replace(/\s+/g,'').replace(/\./g,':');
+const RX=/^([A-Z0-9]+)-(\d{1,2}):(\d{2})$/;
+const canon=r=>{const s=norm(r);const m=RX.exec(s);return m&&!ALL.has(s)?m[1]+'-'+pad(+m[2])+':'+m[3]:s};
+function fasciaOf(t){return t>=280&&t<=320?'mattina':t>=660&&t<=750?'seminotte':t===930?'verdone':t>=990&&t<=1060?'bussolotto':t===1380?'notturna':'altro'}
+function weeksFromBase(d){return Math.round((mon(d)-B0)/(7*864e5))}
+function rawFor(line,d){const [fe,fs]=D.grid[line-1][wkIdx(d)];return holName(d)&&fs?fs:fe}
+function lineOf(matr,d){const p=BASE.findIndex(a=>a.m===matr);if(p<0)return 0;return (((p+weeksFromBase(d))%24)+24)%24+1}
+function personAt(line,d){return BASE[(((line-1-weeksFromBase(d))%24)+24)%24]}
+function mk(d,line,raw){
+  const s=norm(raw);d=sod(d);
+  if(!s)return{d,line,kind:'n',code:'',fascia:'altro',title:'Nessun turno',sub:''};
+  const m=RX.exec(s);
+  if(m&&!ALL.has(s)){const sm=+m[2]*60+ +m[3];const start=new Date(d.getFullYear(),d.getMonth(),d.getDate(),+m[2],+m[3]);
+    const end=new Date(d.getFullYear(),d.getMonth(),d.getDate(),+m[2],+m[3]+DUR);
+    return{d,line,kind:'t',code:m[1],sm,start,end,fascia:fasciaOf(sm),over:(sm+DUR)>=1440,hm:hm(sm),end_hm:hm(sm+DUR),canon:canon(raw)}}
+  return{d,line,kind:'a',code:s,fascia:s==='RIPOSO'?'riposo':'altro',canon:s};
+}
+function shiftOf(matr,d){const l=lineOf(matr,d);return mk(d,l,l?rawFor(l,d):'')}
+function titleOf(s){return s.kind==='t'?`${s.code} · ${s.hm}–${s.end_hm}`:s.code||'Nessun turno'}
+function subOf(s){if(s.kind==='t')return (FNAME[s.fascia]||'')+(s.over?' · finisce il giorno dopo':'');if(s.kind==='a')return s.code==='RIPOSO'?'giornata di riposo':'giornata intera';return ''}
+function dur(ms){const m=Math.round(ms/60000);if(m<60)return m+' min';const h=Math.floor(m/60);if(h<48)return h+' h'+(m%60?' '+(m%60)+' min':'');return Math.round(h/24)+' giorni'}
+const fmtD=d=>DAY[wkIdx(d)]+' '+d.getDate()+' '+MON[d.getMonth()];
+const fmtDL=d=>DAYL[wkIdx(d)]+' '+d.getDate()+' '+MONL[d.getMonth()];
+
+/* ---- stato ---- */
+let me=null;try{const v=localStorage.getItem('turni-matr');if(v&&BASE.some(a=>a.m===+v))me=+v}catch(e){}
+const TABS=[['oggi','Oggi','<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],['settimana','Settimana','<path d="M4 6h16M4 12h16M4 18h16"/>'],
+ ['mese','Mese','<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'],['cerca','Cerca','<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>'],
+ ['tabella','Tabella','<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 10h18M9 4v16"/>']];
+let flt='',tab='oggi',wk=mon(new Date()),mo=new Date(new Date().getFullYear(),new Date().getMonth(),1),selDay=null,q='';
+const route=()=>{const h=(location.hash||'').slice(1);tab=TABS.some(t=>t[0]===h)?h:'oggi'};
+
+/* ---- componenti ---- */
+function needMe(){return `<div class="empty"><b>Scegli un agente</b>Per vedere i turni serve sapere di chi.<br><button class="cta" data-act="pick">Scegli</button></div>`}
+function dayRow(s,today){const h=holName(s.d);
+  return `<div class="row f-${s.fascia}${today?' is-today':''}"><div class="dd"><span>${DAY[wkIdx(s.d)]}</span><b>${s.d.getDate()}</b></div>
+  <div><div class="t">${titleOf(s)}</div><div class="s">${subOf(s)}${h&&subOf(s)?' · ':''}${h||''}</div></div>${h?'<span class="tag">Festa</span>':'<span></span>'}</div>`}
+function weekNav(){const e=add(wk,6);const cur=wk.getTime()===mon(new Date()).getTime();
+  const lbl=`${wk.getDate()} ${wk.getMonth()===e.getMonth()?'':MON[wk.getMonth()]+' '}– ${e.getDate()} ${MON[e.getMonth()]}`;
+  return `<div class="nav"><button class="btn" data-act="wp" aria-label="Settimana precedente">‹</button>
+  <div class="lbl">${lbl}<small>${e.getFullYear()}${me?' · Riga '+lineOf(me,wk):''}</small></div>
+  <button class="btn" data-act="wn" aria-label="Settimana successiva">›</button>${cur?'':'<button class="btn today" data-act="wt">Oggi</button>'}</div>`}
+
+/* ---- viste ---- */
+function vOggi(){
+  if(!me)return needMe();
+  const now=new Date(),today=sod(now),list=[];
+  for(let i=-1;i<=40;i++)list.push(shiftOf(me,add(today,i)));
+  const t0=list[1],cur=list.find(s=>s.kind==='t'&&s.start<=now&&now<s.end);
+  let st='';
+  if(t0.kind==='t'){st=now<t0.start?`Inizia alle ${t0.hm}, tra ${dur(t0.start-now)}`:now<t0.end?`In corso, finisce alle ${t0.end_hm} (tra ${dur(t0.end-now)})`:'Turno concluso'}
+  else if(t0.kind==='a')st=t0.code==='RIPOSO'?'Oggi riposi':'Giornata intera';
+  const h=holName(today);
+  let out=`<h2>Oggi · ${fmtDL(today)}${h?' · '+h:''}</h2><div class="hero f-${t0.fascia}"><span class="k">${FNAME[t0.fascia]||'Turno'}</span>
+   <span class="big">${t0.kind==='t'?t0.code:t0.code||'—'}</span>${t0.kind==='t'?`<span class="time">${t0.hm} – ${t0.end_hm}${t0.over?' (+1)':''}</span>`:''}<span class="st">${st}</span></div>`;
+  if(cur&&cur!==t0)out+=`<div class="card" style="margin-top:10px"><b>Ancora in servizio</b><div class="muted">Turno iniziato ieri alle ${cur.hm}, finisce alle ${cur.end_hm} (tra ${dur(cur.end-now)})</div></div>`;
+  const nx=list.find(s=>s.kind==='t'&&s.start>now&&s.d>today);
+  if(nx)out+=`<h2>Prossimo turno in servizio</h2><div class="row f-${nx.fascia}" style="grid-template-columns:54px 1fr"><div class="dd"><span>${DAY[wkIdx(nx.d)]}</span><b>${nx.d.getDate()}</b></div><div><div class="t">${titleOf(nx)}</div><div class="s">${subOf(nx)} · tra ${dur(nx.start-now)}</div></div></div>`;
+  out+=`<h2>Prossimi giorni</h2><div class="rows">`+list.slice(2,6).map(s=>dayRow(s,false)).join('')+`</div>`;
+  out+=`<p class="muted" style="margin-top:14px">${BASE.find(a=>a.m===me).n} è in Riga ${lineOf(me,today)} questa settimana.</p>`;return out}
+function vSett(){
+  if(!me)return weekNav()+needMe();
+  const today=sod(new Date()).getTime();let rows='';
+  for(let k=0;k<7;k++){const d=add(wk,k);rows+=dayRow(shiftOf(me,d),d.getTime()===today)}
+  return weekNav()+`<div class="rows">${rows}</div>`}
+function vMese(){
+  const f=mo,gs=mon(f),today=sod(new Date()).getTime(),cnt={};let cells='';
+  for(let i=0;i<42;i++){const d=add(gs,i),inn=d.getMonth()===f.getMonth(),s=me?shiftOf(me,d):mk(d,0,''),h=holName(d);
+    if(inn&&me)cnt[s.fascia]=(cnt[s.fascia]||0)+1;
+    const c=s.kind==='t'?`<span class="c">${s.code}</span><span class="h">${s.hm}</span>`:`<span class="c">${s.kind==='a'?(s.code==='RIPOSO'?'Riposo':s.code):''}</span>`;
+    cells+=`<button class="cell f-${me?s.fascia:'altro'}${inn?'':' out'}${h?' hol':''}${d.getTime()===today?' is-today':''}${selDay===key(d)?' sel':''}" data-act="day" data-d="${key(d)}" aria-label="${fmtDL(d)}"><span class="n">${d.getDate()}</span>${me?c:''}</button>`}
+  let det='';
+  if(me){const sd=selDay?selDay.split('-').map(Number):null;const d=sd?new Date(sd[0],sd[1]-1,sd[2]):null;
+    if(d){const s=shiftOf(me,d),h=holName(d);det=`<div class="detail f-${s.fascia}"><b>${fmtDL(d)}${h?' · '+h:''}</b><div>${titleOf(s)}${subOf(s)?' · '+subOf(s):''}</div></div>`}
+    else det=`<div class="detail card muted">Tocca un giorno per vedere il dettaglio.</div>`}
+  const ord=[['riposo','Riposi'],['mattina','Mattine'],['seminotte','Seminotte'],['verdone','Verdone'],['bussolotto','Bussolotto'],['notturna','Notturne'],['altro','Altre giornate']];
+  const sum=me?`<h2>Riepilogo del mese</h2><div class="sum">${ord.map(([k,l])=>`<div class="f-${k}"><span>${l}</span><b>${cnt[k]||0}</b></div>`).join('')}</div>`:'';
+  const curM=f.getFullYear()===new Date().getFullYear()&&f.getMonth()===new Date().getMonth();
+  return `<div class="nav"><button class="btn" data-act="mp" aria-label="Mese precedente">‹</button><div class="lbl">${MONL[f.getMonth()]} ${f.getFullYear()}</div>
+   <button class="btn" data-act="mn" aria-label="Mese successivo">›</button>${curM?'':'<button class="btn today" data-act="mt">Oggi</button>'}</div>
+   <div class="dow">${DAY.map(x=>`<span>${x.slice(0,3)}</span>`).join('')}</div><div class="mgrid">${cells}</div>${det}${sum}${me?'':needMe()}`}
+function shiftList(){const set=new Map();
+  D.grid.forEach(r=>r.forEach(c=>c.forEach(raw=>{if(!raw)return;const k=canon(raw);if(!set.has(k)){const s=mk(new Date(2026,0,5),0,raw);set.set(k,s)}})));
+  return [...set.values()].sort((a,b)=>(a.kind==='t'?0:1)-(b.kind==='t'?0:1)||(a.code<b.code?-1:a.code>b.code?1:0)||((a.sm||0)-(b.sm||0)))}
+function vCerca(){
+  const opts=shiftList().map(s=>`<option value="${s.canon}"${q===s.canon?' selected':''}>${s.kind==='t'?`${s.code} - ${s.hm} (${FNAME[s.fascia]})`:s.code}</option>`).join('');
+  let out=`<label for="q" class="muted">Turno da cercare</label><select id="q"><option value="">Scegli un turno…</option>${opts}</select>`;
+  if(!q)return out+`<div class="empty">Scegli un turno dal menù per vedere chi lo fa e quando lo fa l'agente scelto.</div>`;
+  const e=add(wk,6);let g='',n=0;
+  for(let k=0;k<7;k++){const d=add(wk,k);let items='';
+    for(let L=1;L<=24;L++){const p=personAt(L,d);if(!p.m)continue;if(canon(rawFor(L,d))!==q)continue;n++;
+      items+=`<div class="r${p.m===me?' mine':''}"><b>${p.n}</b><span>${p.m} · Riga ${L}</span></div>`}
+    if(items)g+=`<div class="g">${fmtD(d)}</div>${items}`}
+  out+=`<h2>Questa settimana (${wk.getDate()} ${MON[wk.getMonth()]} – ${e.getDate()} ${MON[e.getMonth()]}) · ${n}</h2><div class="nav" style="margin-bottom:6px"><button class="btn" data-act="wp" aria-label="Settimana precedente">‹</button><div class="lbl"></div><button class="btn" data-act="wn" aria-label="Settimana successiva">›</button></div><div class="res">${g||'<div class="empty">Nessuno ha questo turno nella settimana.</div>'}</div>`;
+  if(me){let m2='',c2=0;const today=sod(new Date());
+    for(let i=0;i<168;i++){const d=add(wk,i);const s=shiftOf(me,d);if(s.canon===q){c2++;const w=Math.floor(i/7);
+      m2+=`<div class="r"><b>${fmtD(d)}</b><span>Riga ${s.line}${w?' · +'+w+' sett.':''}</span></div>`}}
+    out+=`<h2>Quando lo fa ${BASE.find(a=>a.m===me).n} (24 settimane) · ${c2}</h2><div class="res">${m2||'<div class="empty">Non ha questo turno nel prossimo giro.</div>'}</div>`}
+  return out}
+function vTab(){
+  const today=sod(new Date()).getTime();let h='<tr><th class="who">Agente</th>';
+  for(let k=0;k<7;k++){const d=add(wk,k);const hn=holName(d);h+=`<th class="${hn?'hol':''}">${DAY[k]}<small>${d.getDate()} ${MON[d.getMonth()]}</small></th>`}
+  h+='</tr>';let body='';
+  for(let L=1;L<=24;L++){const p=personAt(L,wk);if(!p.m)continue;
+    let r=`<tr class="${p.m===me?'me':''}" data-n="${(p.n+' '+p.m).toLowerCase()}"${flt&&!(p.n+' '+p.m).toLowerCase().includes(flt)?' hidden':''}><td class="who" data-act="who" data-m="${p.m}"><b>${p.n}</b><small>Riga ${L}</small></td>`;
+    for(let k=0;k<7;k++){const d=add(wk,k);const s=mk(d,L,rawFor(L,d));
+      r+=`<td class="s f-${s.fascia}"><b>${s.kind==='t'?s.code:s.code==='RIPOSO'?'Riposo':s.code}</b>${s.kind==='t'?`<i>${s.hm}</i>`:''}</td>`}
+    body+=r+'</tr>'}
+  return weekNav()+`<input id="flt" type="search" placeholder="Filtra per agente (nome o matricola)" autocomplete="off" value="${flt}"><div class="tw"><table><thead>${h}</thead><tbody>${body}</tbody></table></div><p class="muted" style="margin-top:10px">Scorri a destra per vedere tutti i giorni. Tocca un nome per vedere solo i turni di quell'agente; l'agente scelto è in giallo.</p>`}
+
+/* ---- disegno ---- */
+function render(){
+  route();
+  $('#tabs').innerHTML=TABS.map(([id,l,p])=>`<button class="tab" data-act="tab" data-t="${id}"${id===tab?' aria-current="page"':''}><svg viewBox="0 0 24 24" aria-hidden="true">${p}</svg>${l}</button>`).join('');
+  const m=BASE.find(a=>a.m===me);
+  $('#me').innerHTML=m?`<span>${m.n} · ${m.m}</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>`:`<span>Scegli l'agente</span>`;
+  $('#view').innerHTML=({oggi:vOggi,settimana:vSett,mese:vMese,cerca:vCerca,tabella:vTab})[tab]()+`<p class="muted foot">Dati aggiornati il ${D.updated}</p>`;
+}
+function openSheet(){
+  const l=BASE.filter(a=>a.m).slice().sort((a,b)=>a.n<b.n?-1:1);
+  $('#list').innerHTML=l.map(a=>`<button data-act="set" data-m="${a.m}" aria-pressed="${a.m===me}">${a.n}<span>${a.m}</span></button>`).join('');
+  $('#sheet').hidden=false;}
+document.addEventListener('click',e=>{
+  const t=e.target.closest('[data-act]');
+  if(!t){if(e.target.id==='sheet'){$('#sheet').hidden=true}return}
+  const a=t.dataset.act;
+  if(a==='tab'){location.hash=t.dataset.t;return}
+  if(a==='pick'){openSheet();return}
+  if(a==='who'){me=+t.dataset.m;try{localStorage.setItem('turni-matr',String(me))}catch(x){}flt='';location.hash='settimana';render();return}
+  if(a==='set'){me=+t.dataset.m;try{localStorage.setItem('turni-matr',String(me))}catch(x){}$('#sheet').hidden=true}
+  if(a==='wp')wk=add(wk,-7); if(a==='wn')wk=add(wk,7); if(a==='wt')wk=mon(new Date());
+  if(a==='mp'){mo=new Date(mo.getFullYear(),mo.getMonth()-1,1);selDay=null}
+  if(a==='mn'){mo=new Date(mo.getFullYear(),mo.getMonth()+1,1);selDay=null}
+  if(a==='mt'){const n=new Date();mo=new Date(n.getFullYear(),n.getMonth(),1);selDay=null}
+  if(a==='day')selDay=t.dataset.d;
+  render()});
+document.addEventListener('input',e=>{if(e.target.id==='flt'){flt=e.target.value.trim().toLowerCase();document.querySelectorAll('tbody tr[data-n]').forEach(r=>{r.hidden=!!flt&&!r.dataset.n.includes(flt)})}});
+document.addEventListener('change',e=>{if(e.target.id==='q'){q=e.target.value;render()}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#sheet').hidden=true});
+window.addEventListener('hashchange',render);
+setInterval(()=>{if(tab==='oggi'&&$('#sheet').hidden)render()},60000);
+render();
+if(!me)openSheet();
+
+})();
+</script>
