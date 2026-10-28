@@ -152,6 +152,19 @@ td.who{cursor:pointer}
 .sheet .l button{display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:12px;min-height:50px;padding:0 14px}
 .sheet .l button[aria-pressed="true"]{border-color:var(--brand);background:var(--brand-soft);font-weight:700}
 .sheet .l span{color:var(--muted);font-size:14px}
+.tag.cb{color:var(--brand-ink);border-color:var(--brand-ink)}
+.row[data-act]{cursor:pointer}
+.cell{position:relative}
+.cell.cb::after{content:"";position:absolute;top:4px;right:4px;width:8px;height:8px;border-radius:50%;background:var(--brand-ink);box-shadow:0 0 0 2px var(--surface)}
+td.s.cb{box-shadow:inset 0 0 0 2px var(--brand-ink)}
+.ed{display:grid;gap:10px;overflow-y:auto}
+.ed input[type=text]{width:100%;min-height:52px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:0 14px;font:inherit;font-size:17px;text-transform:uppercase}
+.ed .act{display:flex;gap:8px;flex-wrap:wrap}
+.ed .act button{flex:1 1 auto;min-height:48px;border-radius:12px;font-weight:700;padding:0 16px;border:1px solid var(--line);background:var(--bg)}
+.ed .act .ok{background:var(--brand);border-color:var(--brand);color:#fff}
+.ed .act .rm{color:var(--hol);border-color:var(--hol);background:var(--surface)}
+.ed .orig{border-radius:12px;padding:10px 14px}
+.cbl .r button{border:1px solid var(--line);background:var(--bg);border-radius:10px;min-height:40px;padding:0 12px;font-weight:700;font-size:14px}
 @media (prefers-reduced-motion:no-preference){.row,.hero,.card{animation:in .18s ease-out}@keyframes in{from{opacity:.4;transform:translateY(4px)}}}
 </style>
 
@@ -164,6 +177,7 @@ td.who{cursor:pointer}
 <div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sh-t"><div class="p">
   <h3 id="sh-t">Scegli l'agente</h3><p>Puoi vedere i turni di qualsiasi collega. L'app ricorda la scelta su questo telefono.</p>
   <div class="l" id="list"></div></div></div>
+<div class="sheet" id="edsh" hidden role="dialog" aria-modal="true" aria-labelledby="ed-t"><div class="p ed" id="ed"></div></div>
 
 <script>
 (function(){
@@ -215,7 +229,16 @@ function mk(d,line,raw){
     return{d,line,kind:'t',code:m[1],sm,start,end,fascia:fasciaOf(sm),over:(sm+DUR)>=1440,hm:hm(sm),end_hm:hm(sm+DUR),canon:canon(raw)}}
   return{d,line,kind:'a',code:s,fascia:s==='RIPOSO'?'riposo':'altro',canon:s};
 }
-function shiftOf(matr,d){const l=lineOf(matr,d);return mk(d,l,l?rawFor(l,d):'')}
+function shiftOf(matr,d){const l=lineOf(matr,d);const orig=mk(d,l,l?rawFor(l,d):'');const o=ovr(matr,d);if(o==null)return orig;
+  const s=mk(d,l,o);s.cb=1;s.orig=orig;return s}
+function rawAt(L,d){const p=personAt(L,d);const o=p.m?ovr(p.m,d):null;return o!=null?o:rawFor(L,d)}
+/* ---- cambi turno (salvati solo su questo telefono) ---- */
+let CB={};try{CB=JSON.parse(localStorage.getItem('turni-cambi')||'{}')||{}}catch(e){CB={}}
+function ovr(m,d){const x=CB[m];return x&&Object.prototype.hasOwnProperty.call(x,key(d))?x[key(d)]:null}
+function setOvr(m,k,v){if(v==null){if(CB[m]){delete CB[m][k];if(!Object.keys(CB[m]).length)delete CB[m]}}else{(CB[m]=CB[m]||{})[k]=v}
+  try{localStorage.setItem('turni-cambi',JSON.stringify(CB))}catch(e){}}
+const kd=k=>{const [y,m,d]=k.split('-').map(Number);return new Date(y,m-1,d)};
+const short=s=>s.kind==='t'?`${s.code} ${s.hm}`:s.kind==='a'?(s.code==='RIPOSO'?'Riposo':s.code):'nessun turno';
 function titleOf(s){return s.kind==='t'?`${s.code} · ${s.hm}–${s.end_hm}`:s.code||'Nessun turno'}
 function subOf(s){if(s.kind==='t')return (FNAME[s.fascia]||'')+(s.over?' · finisce il giorno dopo':'');if(s.kind==='a')return s.code==='RIPOSO'?'giornata di riposo':'giornata intera';return ''}
 function dur(ms){const m=Math.round(ms/60000);if(m<60)return m+' min';const h=Math.floor(m/60);if(h<48)return h+' h'+(m%60?' '+(m%60)+' min':'');return Math.round(h/24)+' giorni'}
@@ -232,9 +255,9 @@ const route=()=>{const h=(location.hash||'').slice(1);tab=TABS.some(t=>t[0]===h)
 
 /* ---- componenti ---- */
 function needMe(){return `<div class="empty"><b>Scegli un agente</b>Per vedere i turni serve sapere di chi.<br><button class="cta" data-act="pick">Scegli</button></div>`}
-function dayRow(s,today){const h=holName(s.d);
-  return `<div class="row f-${s.fascia}${today?' is-today':''}"><div class="dd"><span>${DAY[wkIdx(s.d)]}</span><b>${s.d.getDate()}</b></div>
-  <div><div class="t">${titleOf(s)}</div><div class="s">${subOf(s)}${h&&subOf(s)?' · ':''}${h||''}</div></div>${h?'<span class="tag">Festa</span>':'<span></span>'}</div>`}
+function dayRow(s,today){const h=holName(s.d);const sub=[subOf(s),h,s.cb?'al posto di '+short(s.orig):''].filter(Boolean).join(' · ');
+  return `<div class="row f-${s.fascia}${today?' is-today':''}" data-act="edit" data-d="${key(s.d)}" role="button" tabindex="0" aria-label="${fmtDL(s.d)}: ${titleOf(s)}. Tocca per segnare un cambio"><div class="dd"><span>${DAY[wkIdx(s.d)]}</span><b>${s.d.getDate()}</b></div>
+  <div><div class="t">${titleOf(s)}</div><div class="s">${sub}</div></div>${s.cb?'<span class="tag cb">Cambio</span>':h?'<span class="tag">Festa</span>':'<span></span>'}</div>`}
 function weekNav(){const e=add(wk,6);const cur=wk.getTime()===mon(new Date()).getTime();
   const lbl=`${wk.getDate()} ${wk.getMonth()===e.getMonth()?'':MON[wk.getMonth()]+' '}– ${e.getDate()} ${MON[e.getMonth()]}`;
   return `<div class="nav"><button class="btn" data-act="wp" aria-label="Settimana precedente">‹</button>
@@ -252,7 +275,7 @@ function vOggi(){
   else if(t0.kind==='a')st=t0.code==='RIPOSO'?'Oggi riposi':'Giornata intera';
   const h=holName(today);
   let out=`<h2>Oggi · ${fmtDL(today)}${h?' · '+h:''}</h2><div class="hero f-${t0.fascia}"><span class="k">${FNAME[t0.fascia]||'Turno'}</span>
-   <span class="big">${t0.kind==='t'?t0.code:t0.code||'—'}</span>${t0.kind==='t'?`<span class="time">${t0.hm} – ${t0.end_hm}${t0.over?' (+1)':''}</span>`:''}<span class="st">${st}</span></div>`;
+   <span class="big">${t0.kind==='t'?t0.code:t0.code||'—'}</span>${t0.kind==='t'?`<span class="time">${t0.hm} – ${t0.end_hm}${t0.over?' (+1)':''}</span>`:''}<span class="st">${st}</span>${t0.cb?`<span class="st"><b>Cambio turno</b> · al posto di ${short(t0.orig)}</span>`:''}</div>`;
   if(cur&&cur!==t0)out+=`<div class="card" style="margin-top:10px"><b>Ancora in servizio</b><div class="muted">Turno iniziato ieri alle ${cur.hm}, finisce alle ${cur.end_hm} (tra ${dur(cur.end-now)})</div></div>`;
   const nx=list.find(s=>s.kind==='t'&&s.start>now&&s.d>today);
   if(nx)out+=`<h2>Prossimo turno in servizio</h2><div class="row f-${nx.fascia}" style="grid-template-columns:54px 1fr"><div class="dd"><span>${DAY[wkIdx(nx.d)]}</span><b>${nx.d.getDate()}</b></div><div><div class="t">${titleOf(nx)}</div><div class="s">${subOf(nx)} · tra ${dur(nx.start-now)}</div></div></div>`;
@@ -262,16 +285,19 @@ function vSett(){
   if(!me)return weekNav()+needMe();
   const today=sod(new Date()).getTime();let rows='';
   for(let k=0;k<7;k++){const d=add(wk,k);rows+=dayRow(shiftOf(me,d),d.getTime()===today)}
-  return weekNav()+`<div class="rows">${rows}</div>`}
+  return weekNav()+`<div class="rows">${rows}</div><p class="muted" style="margin-top:12px">Tocca un giorno per segnare un cambio turno. I cambi restano salvati solo su questo telefono.</p>`+cbList()}
+function cbList(){const x=CB[me]||{},t=key(new Date());const ks=Object.keys(x).filter(k=>k>=t).sort();if(!ks.length)return '';
+  return `<h2>Cambi segnati · ${ks.length}</h2><div class="res cbl">`+ks.map(k=>{const d=kd(k),s=shiftOf(me,d);
+    return `<div class="r"><div><b>${fmtD(d)}</b> · ${short(s)}<br><span>al posto di ${short(s.orig)}</span></div><button data-act="edit" data-d="${k}">Modifica</button></div>`}).join('')+`</div>`}
 function vMese(){
   const f=mo,gs=mon(f),today=sod(new Date()).getTime(),cnt={};let cells='';
   for(let i=0;i<42;i++){const d=add(gs,i),inn=d.getMonth()===f.getMonth(),s=me?shiftOf(me,d):mk(d,0,''),h=holName(d);
     if(inn&&me)cnt[s.fascia]=(cnt[s.fascia]||0)+1;
     const c=s.kind==='t'?`<span class="c">${s.code}</span><span class="h">${s.hm}</span>`:`<span class="c">${s.kind==='a'?(s.code==='RIPOSO'?'Riposo':s.code):''}</span>`;
-    cells+=`<button class="cell f-${me?s.fascia:'altro'}${inn?'':' out'}${h?' hol':''}${d.getTime()===today?' is-today':''}${selDay===key(d)?' sel':''}" data-act="day" data-d="${key(d)}" aria-label="${fmtDL(d)}"><span class="n">${d.getDate()}</span>${me?c:''}</button>`}
+    cells+=`<button class="cell f-${me?s.fascia:'altro'}${inn?'':' out'}${h?' hol':''}${d.getTime()===today?' is-today':''}${selDay===key(d)?' sel':''}${me&&s.cb?' cb':''}" data-act="day" data-d="${key(d)}" aria-label="${fmtDL(d)}"><span class="n">${d.getDate()}</span>${me?c:''}</button>`}
   let det='';
   if(me){const sd=selDay?selDay.split('-').map(Number):null;const d=sd?new Date(sd[0],sd[1]-1,sd[2]):null;
-    if(d){const s=shiftOf(me,d),h=holName(d);det=`<div class="detail f-${s.fascia}"><b>${fmtDL(d)}${h?' · '+h:''}</b><div>${titleOf(s)}${subOf(s)?' · '+subOf(s):''}</div></div>`}
+    if(d){const s=shiftOf(me,d),h=holName(d);det=`<div class="detail f-${s.fascia}"><b>${fmtDL(d)}${h?' · '+h:''}</b><div>${titleOf(s)}${subOf(s)?' · '+subOf(s):''}</div>${s.cb?`<div><b style="font-size:15px">Cambio turno</b> · al posto di ${short(s.orig)}</div>`:''}<button class="cta" style="margin-top:10px;min-height:42px" data-act="edit" data-d="${key(d)}">${s.cb?'Modifica il cambio':'Segna un cambio turno'}</button></div>`}
     else det=`<div class="detail card muted">Tocca un giorno per vedere il dettaglio.</div>`}
   const ord=[['riposo','Riposi'],['mattina','Mattine'],['seminotte','Seminotte'],['verdone','Verdone'],['bussolotto','Bussolotto'],['notturna','Notturne'],['altro','Altre giornate']];
   const sum=me?`<h2>Riepilogo del mese</h2><div class="sum">${ord.map(([k,l])=>`<div class="f-${k}"><span>${l}</span><b>${cnt[k]||0}</b></div>`).join('')}</div>`:'';
@@ -288,7 +314,7 @@ function vCerca(){
   if(!q)return out+`<div class="empty">Scegli un turno dal menù per vedere chi lo fa e quando lo fa l'agente scelto.</div>`;
   const e=add(wk,6);let g='',n=0;
   for(let k=0;k<7;k++){const d=add(wk,k);let items='';
-    for(let L=1;L<=24;L++){const p=personAt(L,d);if(!p.m)continue;if(canon(rawFor(L,d))!==q)continue;n++;
+    for(let L=1;L<=24;L++){const p=personAt(L,d);if(!p.m)continue;if(canon(rawAt(L,d))!==q)continue;n++;
       items+=`<div class="r${p.m===me?' mine':''}"><b>${p.n}</b><span>${p.m} · Riga ${L}</span></div>`}
     if(items)g+=`<div class="g">${fmtD(d)}</div>${items}`}
   out+=`<h2>Questa settimana (${wk.getDate()} ${MON[wk.getMonth()]} – ${e.getDate()} ${MON[e.getMonth()]}) · ${n}</h2><div class="nav" style="margin-bottom:6px"><button class="btn" data-act="wp" aria-label="Settimana precedente">‹</button><div class="lbl"></div><button class="btn" data-act="wn" aria-label="Settimana successiva">›</button></div><div class="res">${g||'<div class="empty">Nessuno ha questo turno nella settimana.</div>'}</div>`;
@@ -303,8 +329,8 @@ function vTab(){
   h+='</tr>';let body='';
   for(let L=1;L<=24;L++){const p=personAt(L,wk);if(!p.m)continue;
     let r=`<tr class="${p.m===me?'me':''}" data-n="${(p.n+' '+p.m).toLowerCase()}"${flt&&!(p.n+' '+p.m).toLowerCase().includes(flt)?' hidden':''}><td class="who" data-act="who" data-m="${p.m}"><b>${p.n}</b><small>Riga ${L}</small></td>`;
-    for(let k=0;k<7;k++){const d=add(wk,k);const s=mk(d,L,rawFor(L,d));
-      r+=`<td class="s f-${s.fascia}"><b>${s.kind==='t'?s.code:s.code==='RIPOSO'?'Riposo':s.code}</b>${s.kind==='t'?`<i>${s.hm}</i>`:''}</td>`}
+    for(let k=0;k<7;k++){const d=add(wk,k);const s=mk(d,L,rawAt(L,d)),c=p.m&&ovr(p.m,d)!=null;
+      r+=`<td class="s f-${s.fascia}${c?' cb':''}"><b>${s.kind==='t'?s.code:s.code==='RIPOSO'?'Riposo':s.code}</b>${s.kind==='t'?`<i>${s.hm}</i>`:''}</td>`}
     body+=r+'</tr>'}
   return weekNav()+`<input id="flt" type="search" placeholder="Filtra per agente (nome o matricola)" autocomplete="off" value="${flt}"><div class="tw"><table><thead>${h}</thead><tbody>${body}</tbody></table></div><p class="muted" style="margin-top:10px">Scorri a destra per vedere tutti i giorni. Tocca un nome per vedere solo i turni di quell'agente; l'agente scelto è in giallo.</p>`}
 
@@ -320,10 +346,29 @@ function openSheet(){
   const l=BASE.filter(a=>a.m).slice().sort((a,b)=>a.n<b.n?-1:1);
   $('#list').innerHTML=l.map(a=>`<button data-act="set" data-m="${a.m}" aria-pressed="${a.m===me}">${a.n}<span>${a.m}</span></button>`).join('');
   $('#sheet').hidden=false;}
+let edK=null;
+function openEd(k){if(!me)return;edK=k;const d=kd(k),s=shiftOf(me,d),o=s.cb?s.orig:s;
+  const list=shiftList(),known=list.some(x=>x.canon===s.canon);
+  const opts=list.map(x=>`<option value="${x.canon}"${x.canon===s.canon?' selected':''}>${x.kind==='t'?`${x.code} - ${x.hm} (${FNAME[x.fascia]})`:x.code}</option>`).join('');
+  $('#ed').innerHTML=`<div><h3 id="ed-t">Cambio turno</h3><p>${fmtDL(d)} · ${BASE.find(a=>a.m===me).n}. Salvato solo su questo telefono.</p></div>
+   <div class="orig f-${o.fascia}"><span class="muted" style="color:inherit;opacity:.8">Turno da tabella</span><br><b>${titleOf(o)}</b></div>
+   <label for="ed-s" class="muted">Turno che farai</label>
+   <select id="ed-s">${opts}<option value="__x"${known?'':' selected'}>Altro (scrivi a mano)…</option></select>
+   <input type="text" id="ed-x" placeholder="Es. FERIE oppure B12-05:10" autocomplete="off" value="${known?'':(s.canon||'')}"${known?' hidden':''}>
+   <div class="act"><button class="ok" data-act="eds">Salva</button>${s.cb?'<button class="rm" data-act="edr">Ripristina originale</button>':''}<button data-act="edc">Annulla</button></div>`;
+  $('#edsh').hidden=false;$('#ed-s').focus()}
+function closeEd(){$('#edsh').hidden=true;edK=null}
 document.addEventListener('click',e=>{
   const t=e.target.closest('[data-act]');
-  if(!t){if(e.target.id==='sheet'){$('#sheet').hidden=true}return}
+  if(!t){if(e.target.id==='sheet'){$('#sheet').hidden=true}if(e.target.id==='edsh')closeEd();return}
   const a=t.dataset.act;
+  if(a==='edit'){openEd(t.dataset.d);return}
+  if(a==='edc'){closeEd();return}
+  if(a==='edr'){setOvr(me,edK,null);closeEd();render();return}
+  if(a==='eds'){const v=$('#ed-s').value;let raw=v==='__x'?norm($('#ed-x').value).replace(/[^A-Z0-9:\-À-Ú]/g,''):v;
+    if(!raw){$('#ed-x').focus();return}
+    const o=shiftOf(me,kd(edK));const orig=o.cb?o.orig:o;
+    setOvr(me,edK,canon(raw)===orig.canon?null:canon(raw));closeEd();render();return}
   if(a==='tab'){location.hash=t.dataset.t;return}
   if(a==='pick'){openSheet();return}
   if(a==='who'){me=+t.dataset.m;try{localStorage.setItem('turni-matr',String(me))}catch(x){}flt='';location.hash='settimana';render();return}
@@ -335,10 +380,12 @@ document.addEventListener('click',e=>{
   if(a==='day')selDay=t.dataset.d;
   render()});
 document.addEventListener('input',e=>{if(e.target.id==='flt'){flt=e.target.value.trim().toLowerCase();document.querySelectorAll('tbody tr[data-n]').forEach(r=>{r.hidden=!!flt&&!r.dataset.n.includes(flt)})}});
-document.addEventListener('change',e=>{if(e.target.id==='q'){q=e.target.value;render()}});
-document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#sheet').hidden=true});
+document.addEventListener('change',e=>{if(e.target.id==='q'){q=e.target.value;render()}
+  if(e.target.id==='ed-s'){const x=$('#ed-x');x.hidden=e.target.value!=='__x';if(!x.hidden)x.focus()}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('#sheet').hidden=true;closeEd()}
+  if((e.key==='Enter'||e.key===' ')&&e.target.matches&&e.target.matches('.row[data-act]')){e.preventDefault();openEd(e.target.dataset.d)}});
 window.addEventListener('hashchange',render);
-setInterval(()=>{if(tab==='oggi'&&$('#sheet').hidden)render()},60000);
+setInterval(()=>{if(tab==='oggi'&&$('#sheet').hidden&&$('#edsh').hidden)render()},60000);
 render();
 if(!me)openSheet();
 
