@@ -1,6 +1,6 @@
 /* Turni Settore Nord: copia locale della pagina per usarla anche senza campo.
    Prima prova la rete (così gli aggiornamenti arrivano subito), se manca usa la copia salvata. */
-const C='turni-v1';
+const C='turni-v2';
 const CORE=['./','./index.html','./manifest.webmanifest','./apple-touch-icon.png','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>Promise.all(CORE.map(u=>c.add(u).catch(()=>{})))));self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
