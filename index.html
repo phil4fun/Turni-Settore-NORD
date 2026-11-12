@@ -313,7 +313,8 @@ function holName(d){const k=d.getDate()+'-'+(d.getMonth()+1);if(FIX[k])return FI
   const p=add(e,1);if(sod(d).getTime()===p.getTime())return "Lunedì dell'Angelo";return ''}
 
 /* ---- turni ---- */
-const norm=r=>(r||'').toUpperCase().replace(/\s+/g,'').replace(/\./g,':');
+const norm=r=>{const s=(r||'').toUpperCase().replace(/\./g,':').replace(/\s+/g,' ').trim(),t=s.replace(/ /g,'');
+  if(RX.test(t)||ALL.has(t))return t;const m=/^([A-Z0-9]+) (\d{1,2}:\d{2})$/.exec(s);return m?m[1]+'-'+m[2]:s};
 const RX=/^([A-Z0-9]+)-(\d{1,2}):(\d{2})$/;
 const canon=r=>{const s=norm(r);const m=RX.exec(s);return m&&!ALL.has(s)?m[1]+'-'+pad(+m[2])+':'+m[3]:s};
 function fasciaOf(t){return t>=280&&t<=320?'mattina':t>=660&&t<=750?'seminotte':t===930?'verdone':t>=990&&t<=1060?'bussolotto':t===1380?'notturna':'altro'}
@@ -335,7 +336,10 @@ function shiftOf(matr,d){const orig=origOf(matr,d);const o=ovr(matr,d);if(o==nul
   const s=mk(d,orig.line,o);s.cb=1;s.orig=orig;const w=SW[matr]&&SW[matr][key(d)];if(w)s.sw=nameOf(w);return s}
 const nameOf=m=>{const a=BASE.find(x=>x.m===+m);return a?a.n:String(m)};
 function rawAt(L,d){const p=personAt(L,d);const o=p.m?ovr(p.m,d):null;return o!=null?o:rawFor(L,d)}
-/* ---- cambi turno (salvati solo su questo telefono) ---- */
+/* ---- archivio condiviso dei cambi (Google Sheet + Apps Script) ----
+   Incolla qui sotto l'indirizzo dell'app web (finisce con /exec). Se resta vuoto, i cambi restano solo sul telefono. */
+const SYNC_URL='';
+/* ---- cambi turno ---- */
 let CB={},SW={};try{CB=JSON.parse(localStorage.getItem('turni-cambi')||'{}')||{}}catch(e){CB={}}
 try{SW=JSON.parse(localStorage.getItem('turni-scambi')||'{}')||{}}catch(e){SW={}}
 function save(){try{localStorage.setItem('turni-cambi',JSON.stringify(CB));localStorage.setItem('turni-scambi',JSON.stringify(SW))}catch(e){}}
@@ -343,7 +347,38 @@ function clearSw(m,k){const o=SW[m]&&SW[m][k];if(!o)return;delete SW[m][k];if(!O
   if(SW[o]){delete SW[o][k];if(!Object.keys(SW[o]).length)delete SW[o]}setOvr(o,k,null)}
 function ovr(m,d){const x=CB[m];return x&&Object.prototype.hasOwnProperty.call(x,key(d))?x[key(d)]:null}
 function setOvr(m,k,v){if(v==null){if(CB[m]){delete CB[m][k];if(!Object.keys(CB[m]).length)delete CB[m]}}else{(CB[m]=CB[m]||{})[k]=v}
+  save();touch(m,k)}
+/* coda delle modifiche da inviare all'archivio (resta salvata se manca la connessione) */
+let Q={},QN=0;try{Q=JSON.parse(localStorage.getItem('turni-q')||'{}')||{}}catch(e){Q={}}
+const SY={st:SYNC_URL?'wait':'off',t:0,busy:false,again:false};
+const has=(o,k)=>!!o&&Object.prototype.hasOwnProperty.call(o,k);
+function saveQ(){try{localStorage.setItem('turni-q',JSON.stringify(Q))}catch(e){}}
+function touch(m,k){if(!SYNC_URL)return;Q[m+'|'+k]=Date.now()+'-'+(++QN);saveQ();clearTimeout(touch.t);touch.t=setTimeout(syncNow,300)}
+function applyRemote(o){
+  const keep=Object.keys(Q).map(x=>{const [m,k]=x.split('|');return [m,k,has(CB[m],k)?CB[m][k]:null,SW[m]&&SW[m][k]||null]});
+  CB={};SW={};
+  for(const m in o.c)if(/^\d+$/.test(m)&&o.c[m]&&typeof o.c[m]==='object')for(const k in o.c[m])if(/^\d{4}-\d{2}-\d{2}$/.test(k))(CB[m]=CB[m]||{})[k]=String(o.c[m][k]).slice(0,24);
+  for(const m in (o.s||{}))if(/^\d+$/.test(m))for(const k in o.s[m])if(/^\d{4}-\d{2}-\d{2}$/.test(k)&&+o.s[m][k])(SW[m]=SW[m]||{})[k]=+o.s[m][k];
+  keep.forEach(([m,k,v,w])=>{if(v==null){if(CB[m]){delete CB[m][k];if(!Object.keys(CB[m]).length)delete CB[m]}}else(CB[m]=CB[m]||{})[k]=v;
+    if(w)(SW[m]=SW[m]||{})[k]=w;else if(SW[m]){delete SW[m][k];if(!Object.keys(SW[m]).length)delete SW[m]}});
   save()}
+async function syncNow(){if(!SYNC_URL)return;if(SY.busy){SY.again=true;return}SY.busy=true;SY.again=false;
+  try{const sent=Object.assign({},Q),keys=Object.keys(sent);let r;
+    if(keys.length){const ops=keys.map(x=>{const [m,k]=x.split('|');return{m,k,n:nameOf(m),v:has(CB[m],k)?CB[m][k]:null,sw:SW[m]&&SW[m][k]||null}});
+      r=await fetch(SYNC_URL,{method:'POST',body:JSON.stringify({ops})}).then(x=>x.json())}
+    else r=await fetch(SYNC_URL+(SYNC_URL.includes('?')?'&':'?')+'t='+Date.now()).then(x=>x.json());
+    if(!r||!r.ok||typeof r.c!=='object')throw 0;
+    keys.forEach(x=>{if(Q[x]===sent[x])delete Q[x]});saveQ();
+    applyRemote(r);SY.st='ok';SY.t=Date.now()}
+  catch(e){SY.st='err'}
+  finally{SY.busy=false;refreshSoft();if(SY.again||(SY.st==='ok'&&Object.keys(Q).length))setTimeout(syncNow,400)}}
+function syncLine(){if(!SYNC_URL)return '';const n=Object.keys(Q).length;
+  if(SY.st==='err')return `Archivio dei cambi non raggiungibile${n?` · ${n} ${n===1?'modifica':'modifiche'} da inviare`:''}: uso la copia sul telefono.`;
+  if(SY.st==='wait'||n)return 'Sincronizzazione dei cambi…';
+  const d=new Date(SY.t);return `Cambi condivisi aggiornati alle ${pad(d.getHours())}:${pad(d.getMinutes())}`}
+function refreshSoft(){const a=document.activeElement;
+  if(a&&a.closest&&a.closest('#view')&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)){const f=$('#sync');if(f)f.textContent=syncLine();return}
+  render();const t=$('#tl-sync');if(t)t.textContent=syncLine()}
 const kd=k=>{const [y,m,d]=k.split('-').map(Number);return new Date(y,m-1,d)};
 const short=s=>s.kind==='t'?`${s.code} ${s.hm}`:s.kind==='a'?(s.code==='RIPOSO'?'Riposo':s.code):'nessun turno';
 function titleOf(s){return s.kind==='t'?`${s.code} · ${s.hm}–${s.end_hm}`:s.code||'Nessun turno'}
@@ -395,7 +430,7 @@ function vSett(){
   if(!me)return weekNav()+needMe();
   const today=sod(new Date()).getTime();let rows='';
   for(let k=0;k<7;k++){const d=add(wk,k);rows+=dayRow(shiftOf(me,d),d.getTime()===today)}
-  return weekNav()+`<div class="rows">${rows}</div><p class="muted" style="margin-top:12px">Tocca un giorno per segnare un cambio turno. I cambi restano salvati solo su questo telefono.</p>`+cbList()}
+  return weekNav()+`<div class="rows">${rows}</div><p class="muted" style="margin-top:12px">Tocca un giorno per segnare un cambio turno. ${SYNC_URL?'I cambi sono condivisi: li vedono tutti i colleghi.':'I cambi restano salvati solo su questo telefono.'}</p>`+cbList()}
 function cbList(){const x=CB[me]||{},t=key(new Date());const ks=Object.keys(x).filter(k=>k>=t).sort();if(!ks.length)return '';
   return `<h2>Cambi segnati · ${ks.length}</h2><div class="res cbl">`+ks.map(k=>{const d=kd(k),s=shiftOf(me,d);
     return `<div class="r"><div><b>${fmtD(d)}</b> · ${short(s)}<br><span>${s.sw?'scambio con '+s.sw+' · ':''}al posto di ${short(s.orig)}</span></div><button data-act="edit" data-d="${k}">Modifica</button></div>`}).join('')+`</div>`}
@@ -510,7 +545,7 @@ function render(){
   const m=BASE.find(a=>a.m===me);
   $('#me').innerHTML=m?`<span>${m.n}<small class="mm"> · ${m.m}</small></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>`:`<span>Scegli l'agente</span>`;
   const hd=$('.top');if(hd)document.documentElement.style.setProperty('--hdr',Math.round(hd.getBoundingClientRect().bottom)+'px');
-  $('#view').innerHTML=({oggi:vOggi,settimana:vSett,mese:vMese,cerca:vCerca,tabella:vTab,ade:vAde})[tab]()+`<p class="muted foot">Dati aggiornati il ${D.updated}</p>`;
+  $('#view').innerHTML=({oggi:vOggi,settimana:vSett,mese:vMese,cerca:vCerca,tabella:vTab,ade:vAde})[tab]()+`<p class="muted foot">Dati aggiornati il ${D.updated}${SYNC_URL?`<br><span id="sync">${syncLine()}</span>`:''}</p>`;
 }
 function openSheet(){
   const l=BASE.filter(a=>a.m).slice().sort((a,b)=>a.n<b.n?-1:1);
@@ -520,7 +555,7 @@ let edK=null;
 function openEd(k){if(!me)return;edK=k;const d=kd(k),s=shiftOf(me,d),o=s.cb?s.orig:s;
   const list=shiftList(),known=list.some(x=>x.canon===s.canon);
   const opts=list.map(x=>`<option value="${x.canon}"${x.canon===s.canon?' selected':''}>${x.kind==='t'?`${x.code} - ${x.hm} (${FNAME[x.fascia]})`:x.code}</option>`).join('');
-  $('#ed').innerHTML=`<div><h3 id="ed-t">Cambio turno</h3><p>${fmtDL(d)} · ${BASE.find(a=>a.m===me).n}. Salvato solo su questo telefono.</p></div>
+  $('#ed').innerHTML=`<div><h3 id="ed-t">Cambio turno</h3><p>${fmtDL(d)} · ${BASE.find(a=>a.m===me).n}. ${SYNC_URL?'Il cambio sarà visibile a tutti i colleghi.':'Salvato solo su questo telefono.'}</p></div>
    <div class="orig f-${o.fascia}"><span class="muted" style="color:inherit;opacity:.8">Turno da tabella</span><br><b>${titleOf(o)}</b></div>
    <span class="muted">Assenza rapida</span>
    <div class="chips">${ASS.map(v=>`<button data-act="chip" data-v="${v}" aria-pressed="${s.cb&&s.canon===v}">${v.charAt(0)+v.slice(1).toLowerCase()}</button>`).join('')}</div>
@@ -564,7 +599,7 @@ function bkRead(txt){txt=(txt||'').trim();if(!txt)throw 0;
   if(!o||typeof o!=='object'||!o.c||typeof o.c!=='object')throw 0;let n=0;
   for(const m in o.c){if(!/^\d+$/.test(m))continue;for(const k in o.c[m]){if(!/^\d{4}-\d{2}-\d{2}$/.test(k))continue;(CB[m]=CB[m]||{})[k]=String(o.c[m][k]).slice(0,24);n++}}
   for(const m in (o.s||{})){if(!/^\d+$/.test(m))continue;for(const k in o.s[m]){if(/^\d{4}-\d{2}-\d{2}$/.test(k))(SW[m]=SW[m]||{})[k]=+o.s[m][k]}}
-  save();return n}
+  save();for(const m in o.c)for(const k in o.c[m])touch(m,k);return n}
 function prefs(){try{return Object.assign({m:3,a:true,r:'sera'},JSON.parse(localStorage.getItem('turni-ics')||'{}'))}catch(e){return{m:3,a:true,r:'sera'}}}
 const tlSt=m=>{const e=$('#tl-st');if(e)e.textContent=m};
 function openTools(){if(!me){openSheet();return}const p=prefs(),n=cbCount();
@@ -578,7 +613,8 @@ function openTools(){if(!me){openSheet();return}const p=prefs(),n=cbCount();
    <div class="act"><button class="ok" data-act="ics">Scarica i turni per il calendario</button></div>
    <p class="muted">Aprendo il file, il telefono ti chiede di aggiungere i turni. Mettili in un calendario dedicato (per esempio "Turni"): quando vuoi aggiornarli lo svuoti e reimporti, senza doppioni.</p>
    <h2>Backup dei cambi · ${n}</h2>
-   <p class="muted">I cambi sono salvati solo in questo browser. Fai un backup per non perderli o per spostarli su un altro telefono.</p>
+   <p class="muted">${SYNC_URL?'I cambi sono salvati nell\'archivio condiviso. Il backup è una copia di sicurezza in più.':'I cambi sono salvati solo in questo browser. Fai un backup per non perderli o per spostarli su un altro telefono.'}</p>
+   ${SYNC_URL?`<p class="tlst" id="tl-sync" style="font-weight:500">${syncLine()}</p><div class="act"><button data-act="syn">Aggiorna i cambi ora</button></div>`:''}
    <div class="act"><button data-act="bkc">Copia codice</button><button data-act="bkf">Scarica file</button></div>
    <label class="muted" for="bk-t">Ripristina: incolla un codice oppure scegli un file</label>
    <textarea id="bk-t" rows="3" placeholder="TURNI1:…" autocomplete="off" spellcheck="false"></textarea>
@@ -592,6 +628,7 @@ document.addEventListener('click',e=>{
   if(!t){if(e.target.id==='sheet'){$('#sheet').hidden=true}if(e.target.id==='edsh')closeEd();if(e.target.id==='tlsh')$('#tlsh').hidden=true;return}
   const a=t.dataset.act;
   if(a==='tools'){openTools();return}
+  if(a==='syn'){SY.st='wait';const t=$('#tl-sync');if(t)t.textContent=syncLine();syncNow();return}
   if(a==='tlc'){$('#tlsh').hidden=true;return}
   if(a==='ics'){const p={m:+$('#ic-p').value,a:$('#ic-a').checked,r:$('#ic-r').value};try{localStorage.setItem('turni-ics',JSON.stringify(p))}catch(x){}
     const r=buildIcs(p.m,p.a,p.r);dl(`turni-${nameOf(me).toLowerCase().replace(/[^a-z0-9]+/g,'-')}-${key(new Date())}.ics`,r.text,'text/calendar;charset=utf-8');tlSt(`File pronto: ${r.n} eventi.`);return}
@@ -604,7 +641,7 @@ document.addEventListener('click',e=>{
   if(a==='edit'){openEd(t.dataset.d);return}
   if(a==='edc'){closeEd();return}
   if(a==='edr'){clearSw(me,edK);setOvr(me,edK,null);closeEd();render();return}
-  if(a==='eds'){const v=$('#ed-s').value;let raw=v==='__x'?norm($('#ed-x').value).replace(/[^A-Z0-9:\-À-Ú]/g,''):v;
+  if(a==='eds'){const v=$('#ed-s').value;let raw=v==='__x'?norm($('#ed-x').value.replace(/[^A-Za-z0-9:.\-À-Úà-ú ]/g,'')):v;
     if(!raw){$('#ed-x').focus();return}
     const d=kd(edK),c=+$('#ed-c').value||0,mine=origOf(me,d);clearSw(me,edK);
     if(c){clearSw(c,edK);const his=origOf(c,d),same=(his.canon||'')===(mine.canon||'');
@@ -639,6 +676,12 @@ window.addEventListener('resize',()=>{const hd=$('.top');if(hd)document.document
 setInterval(()=>{if(tab==='oggi'&&$('#sheet').hidden&&$('#edsh').hidden&&$('#tlsh').hidden)render()},60000);
 render();
 if(!me)openSheet();
+if(SYNC_URL){
+  try{if(localStorage.getItem('turni-sync-init')!==SYNC_URL){for(const m in CB)for(const k in CB[m])touch(m,k);localStorage.setItem('turni-sync-init',SYNC_URL)}}catch(e){}
+  syncNow();
+  setInterval(()=>{if(document.visibilityState==='visible')syncNow()},5*60000);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')syncNow()});
+  window.addEventListener('online',syncNow)}
 if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 
 })();
