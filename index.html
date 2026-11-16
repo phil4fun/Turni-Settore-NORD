@@ -414,21 +414,6 @@ function weekNav(){const e=add(wk,6);const cur=wk.getTime()===mon(new Date()).ge
   <button class="btn" data-act="wn" aria-label="Settimana successiva">›</button>${cur?'':'<button class="btn today" data-act="wt">Oggi</button>'}</div>`}
 
 /* ---- viste ---- */
-/* colleghi in servizio con me in un dato giorno (da tabella, più i cambi segnati su questo telefono) */
-function mates(d){const my=shiftOf(me,d);if(my.kind!=='t')return '';
-  const same=[],pre=[],post=[];
-  BASE.forEach(a=>{if(!a.m||a.m===me)return;
-    for(const dd of [-1,0,1]){const s=shiftOf(a.m,add(d,dd));if(s.kind!=='t')continue;
-      if(dd===0&&s.fascia===my.fascia&&my.fascia!=='altro')same.push([a,s]);
-      if(s.code===my.code){const g1=(s.end-my.start)/6e4,g2=(s.start-my.end)/6e4;
-        if(s.start<my.start&&g1>=-45&&g1<=120)pre.push([a,s]);
-        if(s.start>my.start&&g2>=-120&&g2<=45)post.push([a,s])}}});
-  const byT=(x,y)=>x[1].start-y[1].start||(x[0].n<y[0].n?-1:1);
-  const li=x=>`<div class="res">`+x.sort(byT).map(([a,s])=>`<div class="r"><b>${a.n}</b><span>${s.code} · ${s.hm}–${s.end_hm}${s.cb?' · cambio':''}</span></div>`).join('')+`</div>`;
-  const sec=(t,x)=>x.length?`<p class="muted" style="margin:10px 0 6px">${t}</p>`+li(x):'';
-  const body=sec(`Prima di te a ${my.code}`,pre)+sec(`Dopo di te a ${my.code}`,post)+sec(`Nella tua fascia (${FNAME[my.fascia]})`,same);
-  return `<h2>Chi lavora con te</h2>`+(body||'<p class="muted">Nessun collega in tabella nella tua fascia o sulla tua postazione.</p>')+
-    `<p class="muted" style="margin-top:8px;font-size:13px">Secondo la tabella: i cambi fatti tra colleghi non sono considerati.</p>`}
 function vOggi(){
   if(!me)return needMe();
   const now=new Date(),today=sod(now),list=[];
@@ -441,7 +426,6 @@ function vOggi(){
   let out=`<h2>Oggi · ${fmtDL(today)}${h?' · '+h:''}</h2><div class="hero f-${t0.fascia}"><span class="k">${FNAME[t0.fascia]||'Turno'}</span>
    <span class="big">${t0.kind==='t'?t0.code:t0.code||'—'}</span>${t0.kind==='t'?`<span class="time">${t0.hm} – ${t0.end_hm}${t0.over?' (+1)':''}</span>`:''}<span class="st">${st}</span>${t0.cb?`<span class="st"><b>${t0.sw?'Scambio con '+t0.sw:'Cambio turno'}</b> · al posto di ${short(t0.orig)}</span>`:''}</div>`;
   if(cur&&cur!==t0)out+=`<div class="card" style="margin-top:10px"><b>Ancora in servizio</b><div class="muted">Turno iniziato ieri alle ${cur.hm}, finisce alle ${cur.end_hm} (tra ${dur(cur.end-now)})</div></div>`;
-  out+=mates(today);
   const nx=list.find(s=>s.kind==='t'&&s.start>now&&s.d>today);
   if(nx)out+=`<h2>Prossimo turno in servizio</h2><div class="row f-${nx.fascia}" style="grid-template-columns:54px 1fr"><div class="dd"><span>${DAY[wkIdx(nx.d)]}</span><b>${nx.d.getDate()}</b></div><div><div class="t">${titleOf(nx)}</div><div class="s">${subOf(nx)} · tra ${dur(nx.start-now)}</div></div></div>`;
   out+=`<h2>Prossimi giorni</h2><div class="rows">`+list.slice(2,6).map(s=>dayRow(s,false)).join('')+`</div>`;
@@ -464,7 +448,7 @@ function vMese(){
     cells+=`<button class="cell f-${me?s.fascia:'altro'}${inn?'':' out'}${h?' hol':''}${d.getTime()===today?' is-today':''}${selDay===key(d)?' sel':''}${me&&s.cb?' cb':''}" data-act="day" data-d="${key(d)}" aria-label="${fmtDL(d)}"><span class="n">${d.getDate()}</span>${me?c:''}</button>`}
   let det='';
   if(me){const sd=selDay?selDay.split('-').map(Number):null;const d=sd?new Date(sd[0],sd[1]-1,sd[2]):null;
-    if(d){const s=shiftOf(me,d),h=holName(d);det=`<div class="detail f-${s.fascia}"><b>${fmtDL(d)}${h?' · '+h:''}</b><div>${titleOf(s)}${subOf(s)?' · '+subOf(s):''}</div>${s.cb?`<div><b style="font-size:15px">${s.sw?'Scambio con '+s.sw:'Cambio turno'}</b> · al posto di ${short(s.orig)}</div>`:''}<button class="cta" style="margin-top:10px;min-height:42px" data-act="edit" data-d="${key(d)}">${s.cb?'Modifica il cambio':'Segna un cambio turno'}</button></div>`+mates(d)}
+    if(d){const s=shiftOf(me,d),h=holName(d);det=`<div class="detail f-${s.fascia}"><b>${fmtDL(d)}${h?' · '+h:''}</b><div>${titleOf(s)}${subOf(s)?' · '+subOf(s):''}</div>${s.cb?`<div><b style="font-size:15px">${s.sw?'Scambio con '+s.sw:'Cambio turno'}</b> · al posto di ${short(s.orig)}</div>`:''}<button class="cta" style="margin-top:10px;min-height:42px" data-act="edit" data-d="${key(d)}">${s.cb?'Modifica il cambio':'Segna un cambio turno'}</button></div>`}
     else det=`<div class="detail card muted">Tocca un giorno per vedere il dettaglio.</div>`}
   const ord=[['riposo','Riposi'],['mattina','Mattine'],['seminotte','Seminotte'],['verdone','Verdone'],['bussolotto','Bussolotto'],['notturna','Notturne'],['assenza','Assenze'],['altro','Altre giornate']];
   const cap=x=>x.charAt(0)+x.slice(1).toLowerCase();
