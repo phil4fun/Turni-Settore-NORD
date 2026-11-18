@@ -138,9 +138,9 @@ td.who small{color:var(--muted);font-size:12px}
 td.s{min-width:62px;padding:5px 2px;font-size:12px;line-height:1.15}
 td.s b{display:block;font:700 13px var(--display)}
 td.s i{font:500 12px var(--display);font-style:normal}
-tr.me td.who{background:var(--now);color:#1f2a37}
-tr.me td.who small{color:#1f2a37}
-tr.me td.s{box-shadow:inset 0 2px 0 var(--ink),inset 0 -2px 0 var(--ink)}
+tr.isme td.who{background:var(--now);color:#1f2a37}
+tr.isme td.who small{color:#1f2a37}
+tr.isme td.s{box-shadow:inset 0 2px 0 var(--ink),inset 0 -2px 0 var(--ink)}
 tr.off td.s{opacity:.35}
 input[type=search]{width:100%;min-height:48px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:0 14px;font:inherit;font-size:17px;margin-bottom:10px}
 tbody tr[hidden]{display:none}
@@ -268,6 +268,19 @@ table.adec tbody tr:last-child td{border-bottom:0}
 .lgd{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:10px;font-size:13px;color:var(--muted)}
 .lgd i{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:-2px;margin-right:5px;border:1px solid #9aa9b8}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) table.ade td.x.vac,:root:not([data-theme="light"]) table.ade td.x.fer{color:#10240f}}
+.cmp{display:grid;gap:6px}
+.cmh,.cmr{display:grid;grid-template-columns:46px minmax(0,1fr) minmax(0,1fr);gap:6px;align-items:stretch}
+.cmh span{font:700 12px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--brand);padding:0 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmd{display:grid;place-items:center;align-content:center;border-radius:10px;background:var(--bg);font:600 11px/1.1 var(--display);text-transform:uppercase;color:var(--muted)}
+.cmd b{display:block;font-size:19px;color:var(--ink)}
+.cmd.hol b{color:var(--hol)}
+.cmd.tod{box-shadow:inset 0 0 0 2px var(--now)}
+.cmc{border-radius:10px;padding:6px 8px;min-height:50px;color:var(--f-ink);display:grid;align-content:center}
+.cmc b{font:700 16px/1.1 var(--display)}
+.cmc i{font:500 13px/1.2 var(--display);font-style:normal}
+.cmc.cb{box-shadow:inset 0 0 0 2px var(--brand-ink)}
+.cmn{grid-column:2 / 4;margin:-2px 0 4px;font:700 12px var(--display);letter-spacing:.04em;text-transform:uppercase;color:var(--brand)}
+.cms{background:var(--brand-soft);color:var(--brand-ink);border-radius:12px;padding:10px 12px;font-size:15px}
 @media (prefers-reduced-motion:no-preference){.row,.hero,.card{animation:in .18s ease-out}@keyframes in{from{opacity:.4;transform:translateY(4px)}}}
 </style>
 
@@ -281,6 +294,7 @@ table.adec tbody tr:last-child td{border-bottom:0}
 <div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sh-t"><div class="p">
   <h3 id="sh-t">Scegli l'agente</h3><p>Puoi vedere i turni di qualsiasi collega. L'app ricorda la scelta su questo telefono.</p>
   <div class="l" id="list"></div></div></div>
+<div class="sheet" id="cmsh" hidden role="dialog" aria-modal="true" aria-labelledby="cm-t"><div class="p ed" id="cm"></div></div>
 <div class="sheet" id="tlsh" hidden role="dialog" aria-modal="true" aria-labelledby="tl-t"><div class="p ed" id="tl"></div></div>
 <div class="sheet" id="edsh" hidden role="dialog" aria-modal="true" aria-labelledby="ed-t"><div class="p ed" id="ed"></div></div>
 
@@ -426,8 +440,6 @@ function vOggi(){
   let out=`<h2>Oggi · ${fmtDL(today)}${h?' · '+h:''}</h2><div class="hero f-${t0.fascia}"><span class="k">${FNAME[t0.fascia]||'Turno'}</span>
    <span class="big">${t0.kind==='t'?t0.code:t0.code||'—'}</span>${t0.kind==='t'?`<span class="time">${t0.hm} – ${t0.end_hm}${t0.over?' (+1)':''}</span>`:''}<span class="st">${st}</span>${t0.cb?`<span class="st"><b>${t0.sw?'Scambio con '+t0.sw:'Cambio turno'}</b> · al posto di ${short(t0.orig)}</span>`:''}</div>`;
   if(cur&&cur!==t0)out+=`<div class="card" style="margin-top:10px"><b>Ancora in servizio</b><div class="muted">Turno iniziato ieri alle ${cur.hm}, finisce alle ${cur.end_hm} (tra ${dur(cur.end-now)})</div></div>`;
-  const nx=list.find(s=>s.kind==='t'&&s.start>now&&s.d>today);
-  if(nx)out+=`<h2>Prossimo turno in servizio</h2><div class="row f-${nx.fascia}" style="grid-template-columns:54px 1fr"><div class="dd"><span>${DAY[wkIdx(nx.d)]}</span><b>${nx.d.getDate()}</b></div><div><div class="t">${titleOf(nx)}</div><div class="s">${subOf(nx)} · tra ${dur(nx.start-now)}</div></div></div>`;
   out+=`<h2>Prossimi giorni</h2><div class="rows">`+list.slice(2,6).map(s=>dayRow(s,false)).join('')+`</div>`;
   out+=`<p class="muted" style="margin-top:14px">${BASE.find(a=>a.m===me).n} è in Riga ${lineOf(me,today)} questa settimana.</p>`;return out}
 function vSett(){
@@ -450,12 +462,13 @@ function vMese(){
   if(me){const sd=selDay?selDay.split('-').map(Number):null;const d=sd?new Date(sd[0],sd[1]-1,sd[2]):null;
     if(d){const s=shiftOf(me,d),h=holName(d);det=`<div class="detail f-${s.fascia}"><b>${fmtDL(d)}${h?' · '+h:''}</b><div>${titleOf(s)}${subOf(s)?' · '+subOf(s):''}</div>${s.cb?`<div><b style="font-size:15px">${s.sw?'Scambio con '+s.sw:'Cambio turno'}</b> · al posto di ${short(s.orig)}</div>`:''}<button class="cta" style="margin-top:10px;min-height:42px" data-act="edit" data-d="${key(d)}">${s.cb?'Modifica il cambio':'Segna un cambio turno'}</button></div>`}
     else det=`<div class="detail card muted">Tocca un giorno per vedere il dettaglio.</div>`}
-  const ord=[['riposo','Riposi'],['mattina','Mattine'],['seminotte','Seminotte'],['verdone','Verdone'],['bussolotto','Bussolotto'],['notturna','Notturne'],['assenza','Assenze'],['altro','Altre giornate']];
+  const ord=[['riposo','Riposi'],['mattina','Mattine'],['seminotte','Seminotte'],['verdone','Verdone'],['bussolotto','Bussolotto'],['notturna','Notturne'],['FERIE','Ferie'],['MALATTIA','Malattia'],['altro','Altre giornate']];
   const cap=x=>x.charAt(0)+x.slice(1).toLowerCase();
-  const sum=me?`<h2>Riepilogo del mese</h2><div class="sum">${ord.map(([k,l])=>`<div class="f-${k}"><span>${l}</span><b>${cnt[k]||0}</b></div>`).join('')}</div>
+  const altre=Object.keys(ass).filter(k=>k!=='FERIE'&&k!=='MALATTIA').reduce((t,k)=>t+ass[k],0);
+  const sum=me?`<h2>Riepilogo del mese</h2><div class="sum">${ord.map(([k,l])=>{const n=k===k.toUpperCase()?(ass[k]||0):(cnt[k]||0);return `<div class="f-${k===k.toUpperCase()?'assenza':k}"><span>${l}</span><b>${n}</b></div>`}).join('')}${altre?`<div class="f-assenza"><span>Altre assenze</span><b>${altre}</b></div>`:''}</div>
    <h2>Ore e giornate</h2><div class="sum"><div class="f-altro"><span>Ore di turno</span><b>${Math.floor(ore/60)} h${ore%60?' '+ore%60:''}</b></div>
    <div class="f-altro"><span>Turni</span><b>${ore/DUR}</b></div><div class="f-altro"><span>Festivi lavorati</span><b>${fest}</b></div><div class="f-altro"><span>Domeniche lavorate</span><b>${dom}</b></div>
-   ${Object.keys(ass).sort().map(k=>`<div class="f-assenza"><span>${cap(k)}</span><b>${ass[k]}</b></div>`).join('')}</div>
+</div>
    <p class="muted">Ore calcolate a 6 h 30 per ogni turno con orario. VP, VM, VAR-4 e LP non entrano nel conteggio delle ore.</p>`:'';
   const curM=f.getFullYear()===new Date().getFullYear()&&f.getMonth()===new Date().getMonth();
   return `<div class="nav"><button class="btn" data-act="mp" aria-label="Mese precedente">‹</button><div class="lbl">${MONL[f.getMonth()]} ${f.getFullYear()}</div>
@@ -512,7 +525,7 @@ function vAde(){
   const ft=`<tr><td class="abc" colspan="3">Festività</td><td></td>${days.map((d,k)=>`<td class="${hol[k]?'hl':''}">${hol[k]||''}</td>`).join('')}</tr>`;
   return ctl+`<div class="tw adew"><table class="ade"><thead>${h}</thead><tbody>${b}</tbody><tfoot>${ft}</tfoot></table></div>
    <div class="lgd"><span><i style="background:#ffd966"></i>la tua riga</span><span><i style="background:#a9d18e"></i>in ferie (dai cambi segnati)</span><span><i style="background:#d0e6be"></i>posto vacante</span><span><i style="background:var(--surface)"></i>riga non attiva oggi</span></div>
-   <p class="muted" style="margin-top:8px">Nei giorni festivi vale la riga "festivo", negli altri la riga "feriale". Scorri a destra per i giorni, tocca un cognome per sceglierlo come agente.</p>`}
+   <p class="muted" style="margin-top:8px">Nei giorni festivi vale la riga "festivo", negli altri la riga "feriale". Scorri a destra per i giorni, tocca un cognome per confrontare i suoi turni con i tuoi.</p>`}
 function adeCompact(W,days,hol,tod,myL){
   const two=s=>s.kind==='t'?`<b>${s.code}</b><i>${s.hm}</i>`:s.kind==='a'?`<b${s.code.length>=6?' class="lg"':s.code.length===5?' class="md"':''}>${s.code}</b>`:'';
   let h=`<colgroup><col style="width:82px"><col span="7"></colgroup><thead><tr class="r1"><th class="cc">${myL?'Riga '+myL:'—'}</th>`;
@@ -530,17 +543,40 @@ function adeCompact(W,days,hol,tod,myL){
   const fl=days.map((d,k)=>hol[k]?`${DAY[k].toLowerCase()} ${d.getDate()} ${hol[k]}`:'').filter(Boolean);
   return `<div class="adecw"><table class="adec">${h}<tbody>${b}</tbody></table></div>${fl.length?`<p class="fest">Festività: ${fl.join(' · ')} (vale il turno festivo)</p>`:''}
    <div class="lgd"><span><i style="background:#ffd966"></i>la tua riga</span><span><i style="background:#a9d18e"></i>in ferie (dai cambi segnati)</span><span><i style="background:#d0e6be"></i>posto vacante</span><span><i style="background:#fce4d6"></i>giorno festivo</span></div>
-   <p class="muted" style="margin-top:8px">Per ogni giorno è indicato il turno valido: festivo nei giorni di festa, feriale negli altri. Tocca un cognome per sceglierlo come agente.</p>`}
+   <p class="muted" style="margin-top:8px">Per ogni giorno è indicato il turno valido: festivo nei giorni di festa, feriale negli altri. Tocca un cognome per confrontare i suoi turni con i tuoi.</p>`}
+/* ---- confronto tra me e un collega ---- */
+let cmM=null,cmW=null;
+const isFree=s=>s.kind==='n'||s.code==='RIPOSO'||s.fascia==='assenza';
+function cmChip(s){if(s.kind==='n')return `<div class="cmc f-altro"><b>—</b></div>`;
+  return `<div class="cmc f-${s.fascia}${s.cb?' cb':''}"><b>${s.kind==='t'?s.code:s.code==='RIPOSO'?'Riposo':s.code}</b>${s.kind==='t'?`<i>${s.hm}–${s.end_hm}</i>`:''}</div>`}
+function renderCmp(){const other=nameOf(cmM),e=add(cmW,6),t0=sod(new Date()).getTime();let rows='',fr=0,ins=0,sf=0;
+  for(let k=0;k<7;k++){const d=add(cmW,k),a=shiftOf(me,d),b=shiftOf(cmM,d),h=holName(d);let n='';
+    if(isFree(a)&&isFree(b)){n=a.code==='RIPOSO'&&b.code==='RIPOSO'?'Entrambi a riposo':'Entrambi liberi';fr++}
+    else if(a.kind==='t'&&b.kind==='t'){const ov=a.start<b.end&&b.start<a.end;
+      if(ov&&a.code===b.code){n='Insieme a '+a.code;ins++}
+      else if(ov){n='In servizio insieme';ins++}
+      else if(a.fascia===b.fascia){n='Stessa fascia';sf++}
+      else if(a.code===b.code&&Math.abs(b.start-a.end)<=45*6e4)n='Ti dà il cambio a '+a.code;
+      else if(a.code===b.code&&Math.abs(a.start-b.end)<=45*6e4)n='Gli dai il cambio a '+a.code}
+    rows+=`<div class="cmr"><div class="cmd${h?' hol':''}${d.getTime()===t0?' tod':''}"${h?` title="${h}"`:''}>${DAY[k]}<b>${d.getDate()}</b></div>${cmChip(a)}${cmChip(b)}${n?`<div class="cmn">${n}</div>`:''}</div>`}
+  const parts=[fr?`${fr} ${fr===1?'giorno libero':'giorni liberi'} insieme`:'',ins?`${ins} in servizio insieme`:'',sf?`${sf} nella stessa fascia`:''].filter(Boolean);
+  $('#cm').innerHTML=`<div><h3 id="cm-t">Tu e ${other}</h3><p>Confronto dei turni da tabella, con i cambi segnati su questo telefono.</p></div>
+   <div class="nav" style="margin:0"><button class="btn" data-act="cmp-p" aria-label="Settimana precedente">‹</button><div class="lbl">${cmW.getDate()} ${cmW.getMonth()===e.getMonth()?'':MON[cmW.getMonth()]+' '}– ${e.getDate()} ${MON[e.getMonth()]}<small>${e.getFullYear()}</small></div><button class="btn" data-act="cmp-n" aria-label="Settimana successiva">›</button></div>
+   <div class="cms">${parts.length?parts.join(' · '):'Nessun giorno in comune questa settimana'}</div>
+   <div class="cmp"><div class="cmh"><span></span><span>Tu</span><span>${other}</span></div>${rows}</div>
+   <div class="act"><button data-act="cmp-me">Vedi solo i turni di ${other}</button><button class="ok" data-act="cmp-x">Chiudi</button></div>`}
+function openCmp(m,w){if(!me||m===me){me=m;try{localStorage.setItem('turni-matr',String(me))}catch(x){}flt='';location.hash='settimana';render();return}
+  cmM=m;cmW=mon(w||new Date());renderCmp();$('#cmsh').hidden=false}
 function vTab(){
   const today=sod(new Date()).getTime();let h='<tr><th class="who">Agente</th>';
   for(let k=0;k<7;k++){const d=add(wk,k);const hn=holName(d);h+=`<th class="${hn?'hol':''}">${DAY[k]}<small>${d.getDate()} ${MON[d.getMonth()]}</small></th>`}
   h+='</tr>';let body='';
   for(let L=1;L<=24;L++){const p=personAt(L,wk);if(!p.m)continue;
-    let r=`<tr class="${p.m===me?'me':''}" data-n="${(p.n+' '+p.m).toLowerCase()}"${flt&&!(p.n+' '+p.m).toLowerCase().includes(flt)?' hidden':''}><td class="who" data-act="who" data-m="${p.m}"><b>${p.n}</b><small>Riga ${L}</small></td>`;
+    let r=`<tr class="${p.m===me?'isme':''}" data-n="${(p.n+' '+p.m).toLowerCase()}"${flt&&!(p.n+' '+p.m).toLowerCase().includes(flt)?' hidden':''}><td class="who" data-act="who" data-m="${p.m}"><b>${p.n}</b><small>Riga ${L}</small></td>`;
     for(let k=0;k<7;k++){const d=add(wk,k);const s=mk(d,L,rawAt(L,d)),c=p.m&&ovr(p.m,d)!=null;
       r+=`<td class="s f-${s.fascia}${c?' cb':''}"><b>${s.kind==='t'?s.code:s.code==='RIPOSO'?'Riposo':s.code}</b>${s.kind==='t'?`<i>${s.hm}</i>`:''}</td>`}
     body+=r+'</tr>'}
-  return weekNav()+`<input id="flt" type="search" placeholder="Filtra per agente (nome o matricola)" autocomplete="off" value="${flt}"><div class="tw"><table><thead>${h}</thead><tbody>${body}</tbody></table></div><p class="muted" style="margin-top:10px">Scorri a destra per vedere tutti i giorni. Tocca un nome per vedere solo i turni di quell'agente; l'agente scelto è in giallo.</p>`}
+  return weekNav()+`<input id="flt" type="search" placeholder="Filtra per agente (nome o matricola)" autocomplete="off" value="${flt}"><div class="tw"><table><thead>${h}</thead><tbody>${body}</tbody></table></div><p class="muted" style="margin-top:10px">Scorri a destra per vedere tutti i giorni. Tocca un nome per confrontare i suoi turni con i tuoi; la tua riga è in giallo.</p>`}
 
 /* ---- disegno ---- */
 function render(){
@@ -571,7 +607,7 @@ function openEd(k){if(!me)return;edK=k;const d=kd(k),s=shiftOf(me,d),o=s.cb?s.or
    <div class="act"><button class="ok" data-act="eds">Salva</button>${s.cb?'<button class="rm" data-act="edr">Ripristina originale</button>':''}<button data-act="edc">Annulla</button></div>`;
   $('#edsh').hidden=false;$('#ed-s').focus()}
 function closeEd(){$('#edsh').hidden=true;edK=null}
-const ASS=['FERIE','PERMESSO','MALATTIA','RIPOSO'];
+const ASS=['FERIE','MALATTIA','RIPOSO'];
 function setSel(v){const sel=$('#ed-s');const has=[...sel.options].some(o=>o.value===v);sel.value=has?v:'__x';const x=$('#ed-x');x.hidden=has;if(!has)x.value=v}
 function markChips(v){document.querySelectorAll('.chips button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===v)))}
 
@@ -629,7 +665,7 @@ function openTools(){if(!me){openSheet();return}const p=prefs(),n=cbCount();
 function doImport(txt){try{const n=bkRead(txt);tlSt(`Importati ${n} cambi.`);render()}catch(e){tlSt('Codice o file non valido.')}}
 document.addEventListener('click',e=>{
   const t=e.target.closest('[data-act]');
-  if(!t){if(e.target.id==='sheet'){$('#sheet').hidden=true}if(e.target.id==='edsh')closeEd();if(e.target.id==='tlsh')$('#tlsh').hidden=true;return}
+  if(!t){if(e.target.id==='sheet'){$('#sheet').hidden=true}if(e.target.id==='edsh')closeEd();if(e.target.id==='tlsh')$('#tlsh').hidden=true;if(e.target.id==='cmsh')$('#cmsh').hidden=true;return}
   const a=t.dataset.act;
   if(a==='tools'){openTools();return}
   if(a==='syn'){SY.st='wait';const t=$('#tl-sync');if(t)t.textContent=syncLine();syncNow();return}
@@ -656,8 +692,12 @@ document.addEventListener('click',e=>{
   if(a==='tab'){location.hash=t.dataset.t;return}
   if(a==='pick'){openSheet();return}
   if(a==='aw'){adeWk=kd(t.dataset.d);render();return}
-  if(a==='whoA'){me=+t.dataset.m;try{localStorage.setItem('turni-matr',String(me))}catch(x){}render();return}
-  if(a==='who'){me=+t.dataset.m;try{localStorage.setItem('turni-matr',String(me))}catch(x){}flt='';location.hash='settimana';render();return}
+  if(a==='whoA'){openCmp(+t.dataset.m,adeWk||adeDefault(adeMo));return}
+  if(a==='who'){openCmp(+t.dataset.m,wk);return}
+  if(a==='cmp-p'){cmW=add(cmW,-7);renderCmp();return}
+  if(a==='cmp-n'){cmW=add(cmW,7);renderCmp();return}
+  if(a==='cmp-x'){$('#cmsh').hidden=true;return}
+  if(a==='cmp-me'){$('#cmsh').hidden=true;const m=cmM;me=m;try{localStorage.setItem('turni-matr',String(me))}catch(x){}flt='';location.hash='settimana';render();return}
   if(a==='set'){me=+t.dataset.m;try{localStorage.setItem('turni-matr',String(me))}catch(x){}$('#sheet').hidden=true}
   if(a==='wp')wk=add(wk,-7); if(a==='wn')wk=add(wk,7); if(a==='wt')wk=mon(new Date());
   if(a==='mp'){mo=new Date(mo.getFullYear(),mo.getMonth()-1,1);selDay=null}
@@ -672,12 +712,12 @@ document.addEventListener('change',e=>{if(e.target.id==='q'){q=e.target.value;re
   if(e.target.id==='ed-s'){const x=$('#ed-x');x.hidden=e.target.value!=='__x';if(!x.hidden)x.focus();$('#ed-c').value='';markChips(e.target.value)}
   if(e.target.id==='ed-c'&&e.target.value){const os=origOf(+e.target.value,kd(edK));setSel(os.canon||'');markChips('')}
   if(e.target.id==='bk-f'&&e.target.files[0]){const r=new FileReader();r.onload=()=>doImport(String(r.result));r.readAsText(e.target.files[0]);e.target.value=''}});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('#sheet').hidden=true;$('#tlsh').hidden=true;closeEd()}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('#sheet').hidden=true;$('#tlsh').hidden=true;$('#cmsh').hidden=true;closeEd()}
   if((e.key==='Enter'||e.key===' ')&&e.target.matches&&e.target.matches('.row[data-act]')){e.preventDefault();openEd(e.target.dataset.d)}});
 window.addEventListener('hashchange',render);
 if(NARROW.addEventListener)NARROW.addEventListener('change',()=>{if(tab==='ade')render()});
 window.addEventListener('resize',()=>{const hd=$('.top');if(hd)document.documentElement.style.setProperty('--hdr',Math.round(hd.getBoundingClientRect().bottom)+'px')});
-setInterval(()=>{if(tab==='oggi'&&$('#sheet').hidden&&$('#edsh').hidden&&$('#tlsh').hidden)render()},60000);
+setInterval(()=>{if(tab==='oggi'&&$('#sheet').hidden&&$('#edsh').hidden&&$('#tlsh').hidden&&$('#cmsh').hidden)render()},60000);
 render();
 if(!me)openSheet();
 if(SYNC_URL){
