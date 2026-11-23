@@ -354,9 +354,17 @@ function shiftOf(matr,d){const orig=origOf(matr,d);const o=ovr(matr,d);if(o==nul
   const s=mk(d,orig.line,o);s.cb=1;s.orig=orig;const w=SW[matr]&&SW[matr][key(d)];if(w)s.sw=nameOf(w);return s}
 const nameOf=m=>{const a=BASE.find(x=>x.m===+m);return a?a.n:String(m)};
 function rawAt(L,d){const p=personAt(L,d);const o=p.m?ovr(p.m,d):null;return o!=null?o:rawFor(L,d)}
-/* ---- archivio condiviso dei cambi (Google Sheet + Apps Script) ----
-   Incolla qui sotto l'indirizzo dell'app web (finisce con /exec). Se resta vuoto, i cambi restano solo sul telefono. */
-const SYNC_URL='';
+/* ---- salvataggio online dei cambi (Firebase) ----
+   Incolla qui sotto il blocco firebaseConfig della console Firebase. Se resta null, i cambi restano solo sul telefono. */
+const FIREBASE_CONFIG={
+  apiKey:"AIzaSyCr7_-fxCqFrsJpBzAvV62bU1mfKfZubaE",
+  authDomain:"turni-settore-nord.firebaseapp.com",
+  projectId:"turni-settore-nord",
+  storageBucket:"turni-settore-nord.firebasestorage.app",
+  messagingSenderId:"14305943110",
+  appId:"1:14305943110:web:59d9bc1b04c96c5bb5f447"
+};
+const FBV='10.12.2';
 /* ---- cambi turno ---- */
 let CB={},SW={};try{CB=JSON.parse(localStorage.getItem('turni-cambi')||'{}')||{}}catch(e){CB={}}
 try{SW=JSON.parse(localStorage.getItem('turni-scambi')||'{}')||{}}catch(e){SW={}}
@@ -366,37 +374,68 @@ function clearSw(m,k){const o=SW[m]&&SW[m][k];if(!o)return;delete SW[m][k];if(!O
 function ovr(m,d){const x=CB[m];return x&&Object.prototype.hasOwnProperty.call(x,key(d))?x[key(d)]:null}
 function setOvr(m,k,v){if(v==null){if(CB[m]){delete CB[m][k];if(!Object.keys(CB[m]).length)delete CB[m]}}else{(CB[m]=CB[m]||{})[k]=v}
   save();touch(m,k)}
-/* coda delle modifiche da inviare all'archivio (resta salvata se manca la connessione) */
-let Q={},QN=0;try{Q=JSON.parse(localStorage.getItem('turni-q')||'{}')||{}}catch(e){Q={}}
-const SY={st:SYNC_URL?'wait':'off',t:0,busy:false,again:false};
+/* ogni account ha un suo documento utenti/{uid}: { c:{matricola:{giorno:turno}}, s:{matricola:{giorno:collega}} } */
+const FB={st:FIREBASE_CONFIG?'loading':'off',user:null,auth:null,db:null,ref:null,m:null,unsub:null,err:''};
 const has=(o,k)=>!!o&&Object.prototype.hasOwnProperty.call(o,k);
-function saveQ(){try{localStorage.setItem('turni-q',JSON.stringify(Q))}catch(e){}}
-function touch(m,k){if(!SYNC_URL)return;Q[m+'|'+k]=Date.now()+'-'+(++QN);saveQ();clearTimeout(touch.t);touch.t=setTimeout(syncNow,300)}
-function applyRemote(o){
-  const keep=Object.keys(Q).map(x=>{const [m,k]=x.split('|');return [m,k,has(CB[m],k)?CB[m][k]:null,SW[m]&&SW[m][k]||null]});
-  CB={};SW={};
-  for(const m in o.c)if(/^\d+$/.test(m)&&o.c[m]&&typeof o.c[m]==='object')for(const k in o.c[m])if(/^\d{4}-\d{2}-\d{2}$/.test(k))(CB[m]=CB[m]||{})[k]=String(o.c[m][k]).slice(0,24);
-  for(const m in (o.s||{}))if(/^\d+$/.test(m))for(const k in o.s[m])if(/^\d{4}-\d{2}-\d{2}$/.test(k)&&+o.s[m][k])(SW[m]=SW[m]||{})[k]=+o.s[m][k];
-  keep.forEach(([m,k,v,w])=>{if(v==null){if(CB[m]){delete CB[m][k];if(!Object.keys(CB[m]).length)delete CB[m]}}else(CB[m]=CB[m]||{})[k]=v;
-    if(w)(SW[m]=SW[m]||{})[k]=w;else if(SW[m]){delete SW[m][k];if(!Object.keys(SW[m]).length)delete SW[m]}});
-  save()}
-async function syncNow(){if(!SYNC_URL)return;if(SY.busy){SY.again=true;return}SY.busy=true;SY.again=false;
-  try{const sent=Object.assign({},Q),keys=Object.keys(sent);let r;
-    if(keys.length){const ops=keys.map(x=>{const [m,k]=x.split('|');return{m,k,n:nameOf(m),v:has(CB[m],k)?CB[m][k]:null,sw:SW[m]&&SW[m][k]||null}});
-      r=await fetch(SYNC_URL,{method:'POST',body:JSON.stringify({ops})}).then(x=>x.json())}
-    else r=await fetch(SYNC_URL+(SYNC_URL.includes('?')?'&':'?')+'t='+Date.now()).then(x=>x.json());
-    if(!r||!r.ok||typeof r.c!=='object')throw 0;
-    keys.forEach(x=>{if(Q[x]===sent[x])delete Q[x]});saveQ();
-    applyRemote(r);SY.st='ok';SY.t=Date.now()}
-  catch(e){SY.st='err'}
-  finally{SY.busy=false;refreshSoft();if(SY.again||(SY.st==='ok'&&Object.keys(Q).length))setTimeout(syncNow,400)}}
-function syncLine(){if(!SYNC_URL)return '';const n=Object.keys(Q).length;
-  if(SY.st==='err')return `Archivio dei cambi non raggiungibile${n?` · ${n} ${n===1?'modifica':'modifiche'} da inviare`:''}: uso la copia sul telefono.`;
-  if(SY.st==='wait'||n)return 'Sincronizzazione dei cambi…';
-  const d=new Date(SY.t);return `Cambi condivisi aggiornati alle ${pad(d.getHours())}:${pad(d.getMinutes())}`}
+const online=()=>FB.st==='in';
+/* le modifiche fatte nello stesso tocco partono insieme, lette alla fine (così uno scambio salva entrambe le parti) */
+const PEND=new Set();
+function touch(m,k){if(!online())return;PEND.add(m+'|'+k);if(PEND.size===1)setTimeout(flush,0)}
+function flush(){if(!online()||!PEND.size){PEND.clear();return}const del=FB.m.deleteField(),up={c:{},s:{},agg:FB.m.serverTimestamp()};
+  PEND.forEach(x=>{const [m,k]=x.split('|');(up.c[m]=up.c[m]||{})[k]=has(CB[m],k)?CB[m][k]:del;(up.s[m]=up.s[m]||{})[k]=SW[m]&&SW[m][k]?SW[m][k]:del});PEND.clear();
+  FB.m.setDoc(FB.ref,up,{merge:true}).catch(e=>{FB.err='Salvataggio online non riuscito: riprovo appena possibile.';refreshSoft()})}
+function clean(o,num){const r={};for(const m in (o||{})){if(!/^\d+$/.test(m)||!o[m]||typeof o[m]!=='object')continue;
+  for(const k in o[m]){if(!/^\d{4}-\d{2}-\d{2}$/.test(k))continue;const v=o[m][k];if(v==null)continue;(r[m]=r[m]||{})[k]=num?+v:String(v).slice(0,24)}}return r}
+function fbLine(){if(FB.st==='off')return '';
+  if(FB.st==='loading')return 'Collegamento all\'account…';
+  if(FB.st==='err')return 'Salvataggio online non disponibile: i cambi restano su questo telefono.';
+  if(FB.st==='out')return 'Non hai fatto l\'accesso: i cambi restano solo su questo telefono.';
+  return FB.err||`Cambi salvati online (${FB.user.email||'account Google'})`}
 function refreshSoft(){const a=document.activeElement;
-  if(a&&a.closest&&a.closest('#view')&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)){const f=$('#sync');if(f)f.textContent=syncLine();return}
-  render();const t=$('#tl-sync');if(t)t.textContent=syncLine()}
+  const f=$('#sync');if(f)f.textContent=fbLine();const t=$('#tl-sync');if(t)t.textContent=fbLine();
+  const typing=a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName);
+  if(!(typing&&a.closest('#view'))&&$('#edsh').hidden&&$('#cmsh').hidden)render();
+  if(!$('#tlsh').hidden&&!(typing&&a.closest('#tl')))openTools()}
+async function fbStart(){
+  try{const u='https://www.gstatic.com/firebasejs/'+FBV+'/';
+    const [ap,au,fs]=await Promise.all([import(u+'firebase-app.js'),import(u+'firebase-auth.js'),import(u+'firebase-firestore.js')]);
+    const app=ap.initializeApp(FIREBASE_CONFIG);
+    FB.a=au;FB.m=fs;FB.auth=au.getAuth(app);
+    try{FB.db=fs.initializeFirestore(app,{localCache:fs.persistentLocalCache({tabManager:fs.persistentMultipleTabManager()})})}catch(e){FB.db=fs.getFirestore(app)}
+    au.onAuthStateChanged(FB.auth,user=>{
+      if(FB.unsub){FB.unsub();FB.unsub=null}
+      FB.user=user;FB.err='';
+      if(!user){FB.st='out';FB.ref=null;refreshSoft();return}
+      FB.st='in';FB.ref=fs.doc(FB.db,'utenti',user.uid);
+      const mk='turni-fb-mig-'+user.uid;let first=true;
+      FB.unsub=fs.onSnapshot(FB.ref,snap=>{const d=snap.exists()?snap.data():{};
+        const rc=clean(d.c,false),rs=clean(d.s,true);
+        let migrate=false;try{migrate=first&&localStorage.getItem(mk)!=='1'}catch(e){}
+        if(migrate){/* primo accesso su questo telefono: carico online i cambi che c'erano già */
+          const up={c:{},s:{}};let n=0;
+          for(const m in CB)for(const k in CB[m])if(!has(rc[m],k)){(up.c[m]=up.c[m]||{})[k]=CB[m][k];(rc[m]=rc[m]||{})[k]=CB[m][k];n++;
+            if(SW[m]&&SW[m][k]){(up.s[m]=up.s[m]||{})[k]=SW[m][k];(rs[m]=rs[m]||{})[k]=SW[m][k]}}
+          if(n)fs.setDoc(FB.ref,Object.assign(up,{agg:fs.serverTimestamp()}),{merge:true}).catch(()=>{});
+          try{localStorage.setItem(mk,'1')}catch(e){}}
+        first=false;CB=rc;SW=rs;save();refreshSoft()},
+        e=>{FB.err='Non riesco a leggere i cambi online: uso la copia sul telefono.';refreshSoft()});
+      refreshSoft()})}
+  catch(e){FB.st='err';refreshSoft()}}
+const AUTHERR={'auth/invalid-email':'Email non valida.','auth/missing-password':'Scrivi la password.','auth/weak-password':'Password troppo corta: almeno 6 caratteri.',
+  'auth/email-already-in-use':'Questa email è già registrata: usa "Accedi".','auth/invalid-credential':'Email o password sbagliate.','auth/wrong-password':'Email o password sbagliate.',
+  'auth/user-not-found':'Nessun account con questa email: usa "Registrati".','auth/too-many-requests':'Troppi tentativi: riprova tra qualche minuto.',
+  'auth/network-request-failed':'Nessuna connessione: riprova quando hai campo.','auth/popup-blocked':'Il telefono ha bloccato la finestra di Google: usa email e password.',
+  'auth/popup-closed-by-user':'Accesso con Google annullato.','auth/cancelled-popup-request':'Accesso con Google annullato.',
+  'auth/operation-not-supported-in-this-environment':'Da qui l\'accesso con Google non funziona: usa email e password.'};
+const authMsg=e=>AUTHERR[e&&e.code]||'Operazione non riuscita. Riprova.';
+async function fbDo(a){if(!FB.a)return;const A=FB.a,em=($('#fb-e')||{}).value?$('#fb-e').value.trim():'',pw=($('#fb-p')||{}).value||'';
+  try{if(a==='fb-in'){tlSt('Accesso in corso…',1);await A.signInWithEmailAndPassword(FB.auth,em,pw)}
+    else if(a==='fb-up'){tlSt('Registrazione in corso…',1);await A.createUserWithEmailAndPassword(FB.auth,em,pw)}
+    else if(a==='fb-rs'){if(!em){tlSt('Scrivi prima la tua email.',1);return}await A.sendPasswordResetEmail(FB.auth,em);tlSt('Ti ho mandato un\'email per reimpostare la password.',1);return}
+    else if(a==='fb-g'){await A.signInWithPopup(FB.auth,new A.GoogleAuthProvider())}
+    else if(a==='fb-out'){await A.signOut(FB.auth);CB={};SW={};save();tlSt('Sei uscito. I tuoi cambi restano salvati nel tuo account.',1);render();return}
+    tlSt('',1)}
+  catch(e){tlSt(authMsg(e),1)}}
 const kd=k=>{const [y,m,d]=k.split('-').map(Number);return new Date(y,m-1,d)};
 const short=s=>s.kind==='t'?`${s.code} ${s.hm}`:s.kind==='a'?(s.code==='RIPOSO'?'Riposo':s.code):'nessun turno';
 function titleOf(s){return s.kind==='t'?`${s.code} · ${s.hm}–${s.end_hm}`:s.code||'Nessun turno'}
@@ -407,6 +446,7 @@ const fmtDL=d=>DAYL[wkIdx(d)]+' '+d.getDate()+' '+MONL[d.getMonth()];
 
 /* ---- stato ---- */
 let me=null;try{const v=localStorage.getItem('turni-matr');if(v&&BASE.some(a=>a.m===+v))me=+v}catch(e){}
+let home=me; /* agente scelto all'inizio: resta fisso, i confronti si fanno sempre con lui */
 const TABS=[['oggi','Oggi','<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],['settimana','Settimana','<path d="M4 6h16M4 12h16M4 18h16"/>'],
  ['mese','Mese','<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'],['cerca','Cerca','<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>'],
  ['tabella','Tabella','<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 10h18M9 4v16"/>'],
@@ -446,7 +486,7 @@ function vSett(){
   if(!me)return weekNav()+needMe();
   const today=sod(new Date()).getTime();let rows='';
   for(let k=0;k<7;k++){const d=add(wk,k);rows+=dayRow(shiftOf(me,d),d.getTime()===today)}
-  return weekNav()+`<div class="rows">${rows}</div><p class="muted" style="margin-top:12px">Tocca un giorno per segnare un cambio turno. ${SYNC_URL?'I cambi sono condivisi: li vedono tutti i colleghi.':'I cambi restano salvati solo su questo telefono.'}</p>`+cbList()}
+  return weekNav()+`<div class="rows">${rows}</div><p class="muted" style="margin-top:12px">Tocca un giorno per segnare un cambio turno. ${online()?'I cambi sono salvati nel tuo account: li ritrovi su ogni telefono.':'I cambi restano salvati solo su questo telefono.'}</p>`+cbList()}
 function cbList(){const x=CB[me]||{},t=key(new Date());const ks=Object.keys(x).filter(k=>k>=t).sort();if(!ks.length)return '';
   return `<h2>Cambi segnati · ${ks.length}</h2><div class="res cbl">`+ks.map(k=>{const d=kd(k),s=shiftOf(me,d);
     return `<div class="r"><div><b>${fmtD(d)}</b> · ${short(s)}<br><span>${s.sw?'scambio con '+s.sw+' · ':''}al posto di ${short(s.orig)}</span></div><button data-act="edit" data-d="${k}">Modifica</button></div>`}).join('')+`</div>`}
@@ -549,8 +589,8 @@ let cmM=null,cmW=null;
 const isFree=s=>s.kind==='n'||s.code==='RIPOSO'||s.fascia==='assenza';
 function cmChip(s){if(s.kind==='n')return `<div class="cmc f-altro"><b>—</b></div>`;
   return `<div class="cmc f-${s.fascia}${s.cb?' cb':''}"><b>${s.kind==='t'?s.code:s.code==='RIPOSO'?'Riposo':s.code}</b>${s.kind==='t'?`<i>${s.hm}–${s.end_hm}</i>`:''}</div>`}
-function renderCmp(){const other=nameOf(cmM),e=add(cmW,6),t0=sod(new Date()).getTime();let rows='',fr=0,ins=0,sf=0;
-  for(let k=0;k<7;k++){const d=add(cmW,k),a=shiftOf(me,d),b=shiftOf(cmM,d),h=holName(d);let n='';
+function renderCmp(){const base=home,mine=nameOf(base),other=nameOf(cmM),e=add(cmW,6),t0=sod(new Date()).getTime();let rows='',fr=0,ins=0,sf=0;
+  for(let k=0;k<7;k++){const d=add(cmW,k),a=shiftOf(base,d),b=shiftOf(cmM,d),h=holName(d);let n='';
     if(isFree(a)&&isFree(b)){n=a.code==='RIPOSO'&&b.code==='RIPOSO'?'Entrambi a riposo':'Entrambi liberi';fr++}
     else if(a.kind==='t'&&b.kind==='t'){const ov=a.start<b.end&&b.start<a.end;
       if(ov&&a.code===b.code){n='Insieme a '+a.code;ins++}
@@ -560,12 +600,13 @@ function renderCmp(){const other=nameOf(cmM),e=add(cmW,6),t0=sod(new Date()).get
       else if(a.code===b.code&&Math.abs(a.start-b.end)<=45*6e4)n='Gli dai il cambio a '+a.code}
     rows+=`<div class="cmr"><div class="cmd${h?' hol':''}${d.getTime()===t0?' tod':''}"${h?` title="${h}"`:''}>${DAY[k]}<b>${d.getDate()}</b></div>${cmChip(a)}${cmChip(b)}${n?`<div class="cmn">${n}</div>`:''}</div>`}
   const parts=[fr?`${fr} ${fr===1?'giorno libero':'giorni liberi'} insieme`:'',ins?`${ins} in servizio insieme`:'',sf?`${sf} nella stessa fascia`:''].filter(Boolean);
-  $('#cm').innerHTML=`<div><h3 id="cm-t">Tu e ${other}</h3><p>Confronto dei turni da tabella, con i cambi segnati su questo telefono.</p></div>
+  $('#cm').innerHTML=`<div><h3 id="cm-t">${mine} e ${other}</h3><p>Confronto dei turni da tabella, con i cambi segnati su questo telefono.</p></div>
    <div class="nav" style="margin:0"><button class="btn" data-act="cmp-p" aria-label="Settimana precedente">‹</button><div class="lbl">${cmW.getDate()} ${cmW.getMonth()===e.getMonth()?'':MON[cmW.getMonth()]+' '}– ${e.getDate()} ${MON[e.getMonth()]}<small>${e.getFullYear()}</small></div><button class="btn" data-act="cmp-n" aria-label="Settimana successiva">›</button></div>
    <div class="cms">${parts.length?parts.join(' · '):'Nessun giorno in comune questa settimana'}</div>
-   <div class="cmp"><div class="cmh"><span></span><span>Tu</span><span>${other}</span></div>${rows}</div>
+   <div class="cmp"><div class="cmh"><span></span><span>${mine}</span><span>${other}</span></div>${rows}</div>
    <div class="act"><button data-act="cmp-me">Vedi solo i turni di ${other}</button><button class="ok" data-act="cmp-x">Chiudi</button></div>`}
-function openCmp(m,w){if(!me||m===me){me=m;try{localStorage.setItem('turni-matr',String(me))}catch(x){}flt='';location.hash='settimana';render();return}
+function openCmp(m,w){if(!home){me=home=m;try{localStorage.setItem('turni-matr',String(m))}catch(x){}flt='';location.hash='settimana';render();return}
+  if(m===home)return;
   cmM=m;cmW=mon(w||new Date());renderCmp();$('#cmsh').hidden=false}
 function vTab(){
   const today=sod(new Date()).getTime();let h='<tr><th class="who">Agente</th>';
@@ -585,7 +626,8 @@ function render(){
   const m=BASE.find(a=>a.m===me);
   $('#me').innerHTML=m?`<span>${m.n}<small class="mm"> · ${m.m}</small></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>`:`<span>Scegli l'agente</span>`;
   const hd=$('.top');if(hd)document.documentElement.style.setProperty('--hdr',Math.round(hd.getBoundingClientRect().bottom)+'px');
-  $('#view').innerHTML=({oggi:vOggi,settimana:vSett,mese:vMese,cerca:vCerca,tabella:vTab,ade:vAde})[tab]()+`<p class="muted foot">Dati aggiornati il ${D.updated}${SYNC_URL?`<br><span id="sync">${syncLine()}</span>`:''}</p>`;
+  const guest=home&&me&&me!==home?`<div class="cms" style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px"><span>Stai vedendo i turni di <b>${nameOf(me)}</b></span><button class="btn" style="min-height:40px" data-act="home">Torna a ${nameOf(home)}</button></div>`:'';
+  $('#view').innerHTML=guest+({oggi:vOggi,settimana:vSett,mese:vMese,cerca:vCerca,tabella:vTab,ade:vAde})[tab]()+`<p class="muted foot">Dati aggiornati il ${D.updated}${FB.st!=='off'?`<br><span id="sync">${fbLine()}</span>`:''}</p>`;
 }
 function openSheet(){
   const l=BASE.filter(a=>a.m).slice().sort((a,b)=>a.n<b.n?-1:1);
@@ -595,7 +637,7 @@ let edK=null;
 function openEd(k){if(!me)return;edK=k;const d=kd(k),s=shiftOf(me,d),o=s.cb?s.orig:s;
   const list=shiftList(),known=list.some(x=>x.canon===s.canon);
   const opts=list.map(x=>`<option value="${x.canon}"${x.canon===s.canon?' selected':''}>${x.kind==='t'?`${x.code} - ${x.hm} (${FNAME[x.fascia]})`:x.code}</option>`).join('');
-  $('#ed').innerHTML=`<div><h3 id="ed-t">Cambio turno</h3><p>${fmtDL(d)} · ${BASE.find(a=>a.m===me).n}. ${SYNC_URL?'Il cambio sarà visibile a tutti i colleghi.':'Salvato solo su questo telefono.'}</p></div>
+  $('#ed').innerHTML=`<div><h3 id="ed-t">Cambio turno</h3><p>${fmtDL(d)} · ${BASE.find(a=>a.m===me).n}. ${online()?'Salvato nel tuo account.':'Salvato solo su questo telefono.'}</p></div>
    <div class="orig f-${o.fascia}"><span class="muted" style="color:inherit;opacity:.8">Turno da tabella</span><br><b>${titleOf(o)}</b></div>
    <span class="muted">Assenza rapida</span>
    <div class="chips">${ASS.map(v=>`<button data-act="chip" data-v="${v}" aria-pressed="${s.cb&&s.canon===v}">${v.charAt(0)+v.slice(1).toLowerCase()}</button>`).join('')}</div>
@@ -641,9 +683,18 @@ function bkRead(txt){txt=(txt||'').trim();if(!txt)throw 0;
   for(const m in (o.s||{})){if(!/^\d+$/.test(m))continue;for(const k in o.s[m]){if(/^\d{4}-\d{2}-\d{2}$/.test(k))(SW[m]=SW[m]||{})[k]=+o.s[m][k]}}
   save();for(const m in o.c)for(const k in o.c[m])touch(m,k);return n}
 function prefs(){try{return Object.assign({m:3,a:true,r:'sera'},JSON.parse(localStorage.getItem('turni-ics')||'{}'))}catch(e){return{m:3,a:true,r:'sera'}}}
-const tlSt=m=>{const e=$('#tl-st');if(e)e.textContent=m};
+const tlSt=(m,top)=>{['#tl-st','#tl-st2'].forEach(x=>{const e=$(x);if(e)e.textContent=''});const e=$(top?'#tl-st':'#tl-st2');if(e)e.textContent=m};
 function openTools(){if(!me){openSheet();return}const p=prefs(),n=cbCount();
-  $('#tl').innerHTML=`<div><h3 id="tl-t">Calendario e backup</h3><p>${nameOf(me)} · ${me}</p></div>
+  const acc=FB.st==='off'?'':FB.st==='in'?`<h2>Il tuo account</h2><p class="tlst" id="tl-sync" style="font-weight:500">${fbLine()}</p>
+   <div class="act"><button data-act="fb-out">Esci dall'account</button></div>`
+   :FB.st==='out'?`<h2>Salva i cambi online</h2><p class="muted">Con un account ritrovi i tuoi cambi su qualsiasi telefono. Ognuno vede solo i propri.</p>
+   <label class="muted" for="fb-e">Email</label><input type="text" id="fb-e" inputmode="email" autocomplete="username" autocapitalize="off" spellcheck="false" style="text-transform:none">
+   <label class="muted" for="fb-p">Password (almeno 6 caratteri)</label><input type="password" id="fb-p" autocomplete="current-password" style="width:100%;min-height:52px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:0 14px;font:inherit;font-size:17px">
+   <div class="act"><button class="ok" data-act="fb-in">Accedi</button><button data-act="fb-up">Registrati</button></div>
+   <div class="act"><button data-act="fb-g">Accedi con Google</button><button data-act="fb-rs">Password dimenticata</button></div>`
+   :`<p class="tlst" id="tl-sync" style="font-weight:500">${fbLine()}</p>`;
+  $('#tl').innerHTML=`<div><h3 id="tl-t">${FB.st==='off'?'Calendario e backup':'Account, calendario e backup'}</h3><p>${nameOf(me)} · ${me}</p></div>
+   ${acc}<p class="tlst" id="tl-st" role="status"></p>
    <h2>Aggiungi al calendario del telefono</h2>
    <label class="muted" for="ic-p">Periodo, a partire da oggi</label>
    <select id="ic-p">${[1,2,3,6,12].map(v=>`<option value="${v}"${+p.m===v?' selected':''}>${v===1?'1 mese':v+' mesi'}</option>`).join('')}</select>
@@ -653,13 +704,12 @@ function openTools(){if(!me){openSheet();return}const p=prefs(),n=cbCount();
    <div class="act"><button class="ok" data-act="ics">Scarica i turni per il calendario</button></div>
    <p class="muted">Aprendo il file, il telefono ti chiede di aggiungere i turni. Mettili in un calendario dedicato (per esempio "Turni"): quando vuoi aggiornarli lo svuoti e reimporti, senza doppioni.</p>
    <h2>Backup dei cambi · ${n}</h2>
-   <p class="muted">${SYNC_URL?'I cambi sono salvati nell\'archivio condiviso. Il backup è una copia di sicurezza in più.':'I cambi sono salvati solo in questo browser. Fai un backup per non perderli o per spostarli su un altro telefono.'}</p>
-   ${SYNC_URL?`<p class="tlst" id="tl-sync" style="font-weight:500">${syncLine()}</p><div class="act"><button data-act="syn">Aggiorna i cambi ora</button></div>`:''}
+   <p class="muted">${online()?'I cambi sono già salvati nel tuo account. Il backup è una copia di sicurezza in più.':'I cambi sono salvati solo in questo browser. Fai un backup per non perderli o per spostarli su un altro telefono.'}</p>
    <div class="act"><button data-act="bkc">Copia codice</button><button data-act="bkf">Scarica file</button></div>
    <label class="muted" for="bk-t">Ripristina: incolla un codice oppure scegli un file</label>
    <textarea id="bk-t" rows="3" placeholder="TURNI1:…" autocomplete="off" spellcheck="false"></textarea>
    <div class="act"><button class="ok" data-act="bki">Importa codice</button><label class="fbtn">Scegli file<input type="file" id="bk-f" accept=".json,.txt,application/json,text/plain" hidden></label></div>
-   <p class="tlst" id="tl-st" role="status"></p>
+   <p class="tlst" id="tl-st2" role="status"></p>
    <div class="act"><button data-act="tlc">Chiudi</button></div>`;
   $('#tlsh').hidden=false}
 function doImport(txt){try{const n=bkRead(txt);tlSt(`Importati ${n} cambi.`);render()}catch(e){tlSt('Codice o file non valido.')}}
@@ -668,7 +718,7 @@ document.addEventListener('click',e=>{
   if(!t){if(e.target.id==='sheet'){$('#sheet').hidden=true}if(e.target.id==='edsh')closeEd();if(e.target.id==='tlsh')$('#tlsh').hidden=true;if(e.target.id==='cmsh')$('#cmsh').hidden=true;return}
   const a=t.dataset.act;
   if(a==='tools'){openTools();return}
-  if(a==='syn'){SY.st='wait';const t=$('#tl-sync');if(t)t.textContent=syncLine();syncNow();return}
+  if(/^fb-/.test(a)){fbDo(a);return}
   if(a==='tlc'){$('#tlsh').hidden=true;return}
   if(a==='ics'){const p={m:+$('#ic-p').value,a:$('#ic-a').checked,r:$('#ic-r').value};try{localStorage.setItem('turni-ics',JSON.stringify(p))}catch(x){}
     const r=buildIcs(p.m,p.a,p.r);dl(`turni-${nameOf(me).toLowerCase().replace(/[^a-z0-9]+/g,'-')}-${key(new Date())}.ics`,r.text,'text/calendar;charset=utf-8');tlSt(`File pronto: ${r.n} eventi.`);return}
@@ -686,7 +736,7 @@ document.addEventListener('click',e=>{
     const d=kd(edK),c=+$('#ed-c').value||0,mine=origOf(me,d);clearSw(me,edK);
     if(c){clearSw(c,edK);const his=origOf(c,d),same=(his.canon||'')===(mine.canon||'');
       setOvr(me,edK,same?null:(his.canon||''));setOvr(c,edK,same?null:(mine.canon||''));
-      if(!same){(SW[me]=SW[me]||{})[edK]=c;(SW[c]=SW[c]||{})[edK]=me;save()}}
+      if(!same){(SW[me]=SW[me]||{})[edK]=c;(SW[c]=SW[c]||{})[edK]=me;save();touch(me,edK);touch(c,edK)}}
     else setOvr(me,edK,canon(raw)===mine.canon?null:canon(raw));
     closeEd();render();return}
   if(a==='tab'){location.hash=t.dataset.t;return}
@@ -697,8 +747,9 @@ document.addEventListener('click',e=>{
   if(a==='cmp-p'){cmW=add(cmW,-7);renderCmp();return}
   if(a==='cmp-n'){cmW=add(cmW,7);renderCmp();return}
   if(a==='cmp-x'){$('#cmsh').hidden=true;return}
-  if(a==='cmp-me'){$('#cmsh').hidden=true;const m=cmM;me=m;try{localStorage.setItem('turni-matr',String(me))}catch(x){}flt='';location.hash='settimana';render();return}
-  if(a==='set'){me=+t.dataset.m;try{localStorage.setItem('turni-matr',String(me))}catch(x){}$('#sheet').hidden=true}
+  if(a==='cmp-me'){$('#cmsh').hidden=true;me=cmM;flt='';location.hash='settimana';render();return}
+  if(a==='home'){me=home;render();return}
+  if(a==='set'){me=home=+t.dataset.m;try{localStorage.setItem('turni-matr',String(me))}catch(x){}$('#sheet').hidden=true}
   if(a==='wp')wk=add(wk,-7); if(a==='wn')wk=add(wk,7); if(a==='wt')wk=mon(new Date());
   if(a==='mp'){mo=new Date(mo.getFullYear(),mo.getMonth()-1,1);selDay=null}
   if(a==='mn'){mo=new Date(mo.getFullYear(),mo.getMonth()+1,1);selDay=null}
@@ -720,12 +771,7 @@ window.addEventListener('resize',()=>{const hd=$('.top');if(hd)document.document
 setInterval(()=>{if(tab==='oggi'&&$('#sheet').hidden&&$('#edsh').hidden&&$('#tlsh').hidden&&$('#cmsh').hidden)render()},60000);
 render();
 if(!me)openSheet();
-if(SYNC_URL){
-  try{if(localStorage.getItem('turni-sync-init')!==SYNC_URL){for(const m in CB)for(const k in CB[m])touch(m,k);localStorage.setItem('turni-sync-init',SYNC_URL)}}catch(e){}
-  syncNow();
-  setInterval(()=>{if(document.visibilityState==='visible')syncNow()},5*60000);
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')syncNow()});
-  window.addEventListener('online',syncNow)}
+if(FIREBASE_CONFIG)fbStart();
 if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 
 })();
