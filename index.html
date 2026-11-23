@@ -187,7 +187,11 @@ td.s.cb{box-shadow:inset 0 0 0 2px var(--brand-ink)}
 .chips button[aria-pressed="true"]{border-color:var(--brand);background:var(--brand-soft)}
 .ck{display:flex;gap:10px;align-items:center;min-height:44px;font-size:15px}
 .ck input{width:22px;height:22px;accent-color:var(--brand)}
-.ed textarea{width:100%;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:10px 12px;font:14px/1.3 ui-monospace,monospace;resize:vertical}
+.rst{display:grid;gap:10px}
+.rst summary{min-height:44px;display:flex;align-items:center;font-weight:700;color:var(--brand);cursor:pointer}
+.rst[open]{display:grid}
+.rst>*+*{margin-top:10px}
+.ed textarea{min-height:96px;flex:none;width:100%;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:10px 12px;font:14px/1.3 ui-monospace,monospace;resize:vertical}
 .ed .act .fbtn{flex:1 1 auto;min-height:48px;border-radius:12px;font-weight:700;padding:0 16px;border:1px solid var(--line);background:var(--bg);display:grid;place-items:center;cursor:pointer}
 .tlst{margin:0;font-weight:700;color:var(--brand-ink);min-height:1.4em}
 /* AdE: copia del foglio Excel (colonne A-K) */
@@ -706,9 +710,10 @@ function openTools(){if(!me){openSheet();return}const p=prefs(),n=cbCount();
    <h2>Backup dei cambi · ${n}</h2>
    <p class="muted">${online()?'I cambi sono già salvati nel tuo account. Il backup è una copia di sicurezza in più.':'I cambi sono salvati solo in questo browser. Fai un backup per non perderli o per spostarli su un altro telefono.'}</p>
    <div class="act"><button data-act="bkc">Copia codice</button><button data-act="bkf">Scarica file</button></div>
-   <label class="muted" for="bk-t">Ripristina: incolla un codice oppure scegli un file</label>
+   <details class="rst"><summary>Ripristina un backup</summary>
+   <p class="muted">Serve solo se hai salvato un codice o un file di backup e vuoi recuperare quei cambi. Incolla il codice e tocca "Importa codice", oppure scegli il file.</p>
    <textarea id="bk-t" rows="3" placeholder="TURNI1:…" autocomplete="off" spellcheck="false"></textarea>
-   <div class="act"><button class="ok" data-act="bki">Importa codice</button><label class="fbtn">Scegli file<input type="file" id="bk-f" accept=".json,.txt,application/json,text/plain" hidden></label></div>
+   <div class="act"><button class="ok" data-act="bki">Importa codice</button><label class="fbtn">Scegli file<input type="file" id="bk-f" accept=".json,.txt,application/json,text/plain" hidden></label></div></details>
    <p class="tlst" id="tl-st2" role="status"></p>
    <div class="act"><button data-act="tlc">Chiudi</button></div>`;
   $('#tlsh').hidden=false}
